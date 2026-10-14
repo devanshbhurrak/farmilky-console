@@ -6,7 +6,8 @@ export const outcomeSchema = z
     actualQuantity: z.coerce.number().min(0).optional(),
     reason: z.string().optional(),
     notes: z.string().optional(),
-    paymentMode: z.string().optional(),
+    // Backend subscription delivery-outcome requires deliveryDate (YYYY-MM-DD).
+    deliveryDate: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if ((values.status === 'partial' || values.status === 'extra') && values.actualQuantity == null) {

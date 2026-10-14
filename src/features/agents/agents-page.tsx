@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, UserCog } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
@@ -145,6 +145,7 @@ export default function AgentsPage() {
         onRetry={() => refetch()}
         emptyTitle="No agents found"
         emptyMessage="Try adjusting your search or filters, or add a new agent."
+        emptyIcon={<UserCog className="size-6" />}
         emptyActionLabel="New agent"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(a) => <AgentCard agent={a} onClick={(ag) => navigate(`/agents/${getId(ag)}`)} />}

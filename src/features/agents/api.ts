@@ -1,4 +1,4 @@
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { getId, getName, normalizeList, unwrapData } from '@/lib/utils';
 import type { Agent, AgentListParams } from '@/types/agent';
 import type { Manifest, ManifestEntry } from '@/types/manifest';
@@ -88,9 +88,14 @@ export const agentsApi = {
     await api.delete<unknown>(`/api/agents/${id}`);
   },
 
-  async myToday(): Promise<AgentToday> {
-    const res = await api.get<unknown>('/api/manifests/my/today');
-    return toAgentToday(res);
+  async myToday(): Promise<AgentToday | null> {
+    try {
+      const res = await api.get<unknown>('/api/manifests/my/today');
+      return toAgentToday(res);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
   },
 
   async areasLite(): Promise<{ id: string; name: string }[]> {

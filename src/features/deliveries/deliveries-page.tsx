@@ -256,6 +256,7 @@ export default function DeliveriesPage() {
 
       <OutcomeSheet
         entry={activeEntry}
+        date={date}
         open={outcomeOpen}
         onOpenChange={(open) => {
           setOutcomeOpen(open);

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Scale } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/page-header';
@@ -8,7 +9,8 @@ import { SearchInput } from '@/components/data/search-input';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { StatCard } from '@/components/data/stat-card';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -228,24 +230,9 @@ export default function BalancesPage() {
       <PageHeader title="Balances" description="Customer outstanding balances at a glance" />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Total debt</p>
-            <p className="text-lg font-semibold text-red-600">{formatCurrency(stats.debt)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Total advances</p>
-            <p className="text-lg font-semibold text-emerald-600">{formatCurrency(stats.advances)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Customers</p>
-            <p className="text-lg font-semibold text-slate-900">{stats.count}</p>
-          </CardContent>
-        </Card>
+        <StatCard label="Total debt" value={formatCurrency(stats.debt)} valueClassName="text-red-600" />
+        <StatCard label="Total advances" value={formatCurrency(stats.advances)} valueClassName="text-emerald-600" />
+        <StatCard label="Customers" value={stats.count} />
       </div>
 
       <SearchInput
@@ -270,6 +257,7 @@ export default function BalancesPage() {
         onRetry={() => balancesQuery.refetch()}
         emptyTitle="No balances found"
         emptyMessage="Try adjusting your search."
+        emptyIcon={<Scale className="size-6" />}
         renderCard={(r) => {
           const b = balanceOf(r);
           return (
@@ -310,21 +298,25 @@ export default function BalancesPage() {
       />
 
       <Dialog open={Boolean(collectRow)} onOpenChange={(open) => { if (!open) setCollectRow(null); }}>
-        <DialogHeader>
-          <DialogTitle>Collect payment{collectRow ? ` — ${rowName(collectRow)}` : ''}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          {collectRow ? <CollectBalanceForm row={collectRow} onSuccess={() => setCollectRow(null)} /> : null}
-        </DialogBody>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Collect payment{collectRow ? ` — ${rowName(collectRow)}` : ''}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {collectRow ? <CollectBalanceForm row={collectRow} onSuccess={() => setCollectRow(null)} /> : null}
+          </DialogBody>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(adjustRow)} onOpenChange={(open) => { if (!open) setAdjustRow(null); }}>
-        <DialogHeader>
-          <DialogTitle>Adjust balance{adjustRow ? ` — ${rowName(adjustRow)}` : ''}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          {adjustRow ? <AdjustBalanceForm row={adjustRow} onSuccess={() => setAdjustRow(null)} /> : null}
-        </DialogBody>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust balance{adjustRow ? ` — ${rowName(adjustRow)}` : ''}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {adjustRow ? <AdjustBalanceForm row={adjustRow} onSuccess={() => setAdjustRow(null)} /> : null}
+          </DialogBody>
+        </DialogContent>
       </Dialog>
     </div>
   );

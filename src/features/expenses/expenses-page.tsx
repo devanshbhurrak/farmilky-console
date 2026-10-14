@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { StatCard } from '@/components/data/stat-card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FilterBar, type ActiveFilter } from '@/components/data/filter-bar';
@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, formatDate, getId, titleCase } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, getId, titleCase } from '@/lib/utils';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHODS,
@@ -91,6 +91,7 @@ export default function ExpensesPage() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Expense | null>(null);
   const [deleting, setDeleting] = React.useState<Expense | null>(null);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const updateUrl = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
@@ -130,6 +131,7 @@ export default function ExpensesPage() {
                 setEditing(null);
                 setSheetOpen(true);
               }}
+              className="min-h-11"
             >
               <Plus />
               Add expense
@@ -139,41 +141,41 @@ export default function ExpensesPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Total</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">
-              {formatCurrency(summary?.total ?? 0)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Entries</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">{summary?.count ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Top category</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">
-              {topCategory ? titleCase(topCategory.category) : '—'}
-            </p>
-            {topCategory ? (
-              <p className="text-xs text-slate-500">{formatCurrency(topCategory.total)}</p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <StatCard label="Total" value={formatCurrency(summary?.total ?? 0)} />
+        <StatCard label="Entries" value={summary?.count ?? 0} />
+        <StatCard
+          label="Top category"
+          value={topCategory ? titleCase(topCategory.category) : '—'}
+          subtitle={topCategory ? formatCurrency(topCategory.total) : undefined}
+        />
       </div>
 
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-        <SearchInput
-          value={rawSearch}
-          onChange={(v) => updateUrl({ search: v, page: null })}
-          placeholder="Search expenses…"
-          className="lg:max-w-xs"
-        />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput
+            value={rawSearch}
+            onChange={(v) => updateUrl({ search: v, page: null })}
+            placeholder="Search expenses…"
+            className="flex-1"
+          />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              (category !== 'all' || from || to) && 'border-primary-300',
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {(category !== 'all' || from || to) ? (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                {[category !== 'all', Boolean(from), Boolean(to)].filter(Boolean).length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
           <Select
             value={category}
             onChange={(e) =>
@@ -188,23 +190,18 @@ export default function ExpensesPage() {
               </option>
             ))}
           </Select>
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={from}
-              onChange={(e) => updateUrl({ from: e.target.value, page: null })}
-              aria-label="From date"
-              className="w-auto"
-            />
-            <span className="text-sm text-slate-500">to</span>
-            <Input
-              type="date"
-              value={to}
-              onChange={(e) => updateUrl({ to: e.target.value, page: null })}
-              aria-label="To date"
-              className="w-auto"
-            />
-          </div>
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => updateUrl({ from: e.target.value, page: null })}
+            aria-label="From date"
+          />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => updateUrl({ to: e.target.value, page: null })}
+            aria-label="To date"
+          />
         </div>
       </div>
       <FilterBar

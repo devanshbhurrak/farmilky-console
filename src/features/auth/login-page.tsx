@@ -20,7 +20,11 @@ export function LoginPage() {
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: '', password: '', tenantSlug: '' },
+    defaultValues: {
+      identifier: '',
+      password: '',
+      tenantSlug: import.meta.env.VITE_TENANT_SLUG ?? 'farmilky',
+    },
   });
 
   React.useEffect(() => {
@@ -53,13 +57,6 @@ export function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-            <FormField label="Organization slug" required error={form.formState.errors.tenantSlug?.message}>
-              <Input
-                placeholder="my-dairy"
-                autoComplete="organization"
-                {...form.register('tenantSlug')}
-              />
-            </FormField>
             <FormField label="Email or phone" required error={form.formState.errors.identifier?.message}>
               <Input
                 placeholder="admin@farmilky.com"

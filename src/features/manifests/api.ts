@@ -9,7 +9,7 @@ export interface GenerateManifestRequest {
 
 export interface ManifestEntryUpdate {
   status: string;
-  deliveryNotes?: string;
+  notes?: string;
   failureReason?: string;
 }
 
@@ -26,7 +26,7 @@ export const manifestsApi = {
   get: (id: string) => api.get<ApiResponse<Manifest>>(`/api/manifests/${id}`),
   generate: (data: GenerateManifestRequest) => api.post<ApiResponse<unknown>>('/api/manifests/generate', data),
   resequence: (id: string, entryIds: string[]) =>
-    api.put<ApiResponse<Manifest>>(`/api/manifests/${id}/resequence`, { entryIds }),
+    api.put<ApiResponse<Manifest>>(`/api/manifests/${id}/resequence`, { orderedEntryIds: entryIds }),
   updateEntry: (manifestId: string, entryId: string, data: ManifestEntryUpdate) =>
     api.put<ApiResponse<unknown>>(`/api/manifests/${manifestId}/entries/${entryId}`, data),
   myToday: () => api.get<ApiResponse<Manifest>>('/api/manifests/my/today'),

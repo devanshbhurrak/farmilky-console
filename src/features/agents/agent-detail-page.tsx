@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { FormSection } from '@/components/form/form-field';
@@ -51,11 +52,21 @@ export default function AgentDetailPage() {
   }
 
   if (isLoading || !agent) {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col gap-4">
+          <PageHeader title="Agent" breadcrumbs={[{ label: 'Agents', path: '/agents' }, { label: 'Details' }]} />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-4">
         <PageHeader title="Agent" breadcrumbs={[{ label: 'Agents', path: '/agents' }, { label: 'Details' }]} />
         <Card>
-          <CardContent className="p-6 text-sm text-slate-500">{isLoading ? 'Loading…' : 'Agent not found.'}</CardContent>
+          <CardContent className="p-6 text-sm text-slate-500">Agent not found.</CardContent>
         </Card>
       </div>
     );

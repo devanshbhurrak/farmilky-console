@@ -38,25 +38,54 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
   return `${prefix}${path}${qs}`;
 }
 
+// Deduplicates concurrent refresh attempts — only one POST /refresh in-flight at a time.
+let refreshAttempt: Promise<boolean> | null = null;
+function attemptTokenRefresh(): Promise<boolean> {
+  if (!refreshAttempt) {
+    refreshAttempt = fetch(`${API_BASE}/api/users/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => { refreshAttempt = null; });
+  }
+  return refreshAttempt;
+}
+
 async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const fetchOpts: RequestInit = {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+    ...options,
+  };
   let response: Response;
   try {
-    response = await fetch(url, {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers ?? {}),
-      },
-      ...options,
-    });
+    response = await fetch(url, fetchOpts);
   } catch {
     throw new ApiError(0, 'Network error. Check your connection and try again.');
   }
 
   if (response.status === 401) {
-    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
-    throw new ApiError(401, 'Session expired. Please log in again.');
+    // Don't try to refresh if this IS the refresh or login request (prevent loops).
+    const isAuthEndpoint = path.includes('/api/users/refresh') || path.includes('/api/users/login');
+    if (!isAuthEndpoint && (await attemptTokenRefresh())) {
+      // Fresh cookies set — retry original request.
+      try {
+        response = await fetch(url, fetchOpts);
+      } catch {
+        throw new ApiError(0, 'Network error. Check your connection and try again.');
+      }
+    }
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      throw new ApiError(401, 'Session expired. Please log in again.');
+    }
   }
 
   let data: unknown = null;

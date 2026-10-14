@@ -30,8 +30,14 @@ export function ManifestEntryCard({
   const form = useForm<ManifestEntryUpdateInput>({
     resolver: zodResolver(entryUpdateSchema),
     defaultValues: {
-      status: (entry.status as ManifestEntryUpdateInput['status']) ?? 'pending',
-      deliveryNotes: entry.deliveryNotes ?? '',
+      // 'pending' is not a valid update target — fall back to 'delivered'.
+      status: (['delivered', 'failed', 'skipped'] as const).includes(
+        entry.status as 'delivered' | 'failed' | 'skipped',
+      )
+        ? (entry.status as ManifestEntryUpdateInput['status'])
+        : 'delivered',
+      // Backend response field is `deliveryNotes`; the update request uses `notes`.
+      notes: entry.deliveryNotes ?? '',
       failureReason: entry.failureReason ?? '',
     },
   });
@@ -100,14 +106,13 @@ export function ManifestEntryCard({
           <form onSubmit={form.handleSubmit(submit)} className="mt-4 flex flex-col gap-4">
             <FormField label="Status" required error={form.formState.errors.status?.message}>
               <Select {...form.register('status')}>
-                <option value="pending">Pending</option>
                 <option value="delivered">Delivered</option>
                 <option value="failed">Failed</option>
                 <option value="skipped">Skipped</option>
               </Select>
             </FormField>
-            <FormField label="Delivery notes" error={form.formState.errors.deliveryNotes?.message}>
-              <Textarea {...form.register('deliveryNotes')} placeholder="Notes for the delivery" />
+            <FormField label="Delivery notes" error={form.formState.errors.notes?.message}>
+              <Textarea {...form.register('notes')} placeholder="Notes for the delivery" />
             </FormField>
             <FormField label="Failure reason" error={form.formState.errors.failureReason?.message} hint="Required when failed">
               <Input {...form.register('failureReason')} placeholder="Why did delivery fail?" />

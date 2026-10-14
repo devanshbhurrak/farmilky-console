@@ -9,8 +9,10 @@ export type GenerateManifestInput = z.infer<typeof generateSchema>;
 
 export const entryUpdateSchema = z
   .object({
-    status: z.enum(['pending', 'delivered', 'failed', 'skipped']),
-    deliveryNotes: z.string().optional(),
+    // Backend updateEntrySchema accepts delivered|partial|extra|failed|skipped;
+    // pending is not a valid update target.
+    status: z.enum(['delivered', 'failed', 'skipped']),
+    notes: z.string().optional(),
     failureReason: z.string().optional(),
   })
   .superRefine((values, ctx) => {

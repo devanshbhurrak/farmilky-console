@@ -1,7 +1,8 @@
+import { Fragment } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { NAV_ITEMS } from '@/lib/navigation';
+import { NAV_GROUPS, NAV_ITEMS } from '@/lib/navigation';
 import { useAuth } from '@/features/auth/auth-provider';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -29,25 +30,57 @@ export function MobileDrawer({ open, onOpenChange }: { open: boolean; onOpenChan
         </SheetHeader>
         <SheetBody>
           <nav aria-label="All sections" className="grid grid-cols-2 gap-2">
-            {items.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                onClick={() => onOpenChange(false)}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2.5 rounded-xl border p-3 text-sm font-medium',
-                    isActive
-                      ? 'border-primary-200 bg-primary-50 text-primary-800'
-                      : 'border-slate-200 bg-white text-slate-700',
-                  )
-                }
-              >
-                <item.icon className="size-4.5 shrink-0" aria-hidden />
-                {item.label}
-              </NavLink>
-            ))}
+            {NAV_GROUPS.map((group) => {
+              const groupItems = items.filter((item) => item.group === group.key);
+              if (groupItems.length === 0) return null;
+              return (
+                <Fragment key={group.key}>
+                  <p className="col-span-2 mt-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase first:mt-0">
+                    {group.label}
+                  </p>
+                  {groupItems.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.path === '/'}
+                      onClick={() => onOpenChange(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-2.5 rounded-xl border p-3 text-sm font-medium',
+                          isActive
+                            ? 'border-primary-200 bg-primary-50 text-primary-800'
+                            : 'border-slate-200 bg-white text-slate-700',
+                        )
+                      }
+                    >
+                      <item.icon className="size-4.5 shrink-0" aria-hidden />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </Fragment>
+              );
+            })}
+            {items
+              .filter((item) => !item.group)
+              .map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  onClick={() => onOpenChange(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-2.5 rounded-xl border p-3 text-sm font-medium',
+                      isActive
+                        ? 'border-primary-200 bg-primary-50 text-primary-800'
+                        : 'border-slate-200 bg-white text-slate-700',
+                    )
+                  }
+                >
+                  <item.icon className="size-4.5 shrink-0" aria-hidden />
+                  {item.label}
+                </NavLink>
+              ))}
           </nav>
           <button
             onClick={() => {

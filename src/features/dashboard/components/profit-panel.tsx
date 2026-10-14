@@ -38,10 +38,12 @@ export function ProfitPanel({ data, loading }: { data: ProfitData | null | undef
           <span className="text-slate-500">Profit</span>
           <span className={`font-semibold ${profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(profit)}</span>
         </div>
-        <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100" title={`Margin ${Math.round(margin)}%`}>
-          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${margin}%` }} />
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs font-medium whitespace-nowrap text-slate-600">{Math.round(margin)}%</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${margin}%` }} />
+          </div>
         </div>
-        <p className="text-xs text-slate-500">{Math.round(margin)}% margin</p>
       </CardContent>
     </Card>
   );

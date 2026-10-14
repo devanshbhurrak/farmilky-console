@@ -80,7 +80,11 @@ export default function DashboardPage() {
       )}
 
       {statsQuery.isLoading ? (
-        <Skeleton className="h-24 w-full" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[76px] w-full rounded-xl" />
+          ))}
+        </div>
       ) : (
         <MetricCards stats={stats} boardSummary={null} supplyRows={[]} pendingDeliveries={pendingDeliveries} />
       )}

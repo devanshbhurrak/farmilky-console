@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Receipt, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable, type Column } from '@/components/data/data-table';
 import { SearchInput } from '@/components/data/search-input';
@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, getErrorMessage, getId } from '@/lib/utils';
+import { cn, formatCurrency, getErrorMessage, getId } from '@/lib/utils';
 import { INVOICE_STATUSES, type Invoice } from '@/types/invoice';
 import { useInvoices } from './hooks';
 import { InvoiceCard, customerLabel, periodLabel } from './components/invoice-table';
@@ -34,6 +34,7 @@ export default function InvoicesPage() {
 
   const [generateOpen, setGenerateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -116,43 +117,63 @@ export default function InvoicesPage() {
         }
       />
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-32 text-center text-sm font-medium text-slate-700" aria-live="polite">
-            {periodLabel({ billingPeriod: { month, year } } as Invoice)}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Next month"
-            disabled={atCurrentMonth}
-            onClick={() => shiftMonth(1)}
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput
+            value={search}
+            onChange={(v) => setParam('search', v)}
+            placeholder="Search invoices…"
+            className="flex-1"
+          />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              Boolean(status) && 'border-primary-300',
+            )}
           >
-            <ChevronRight />
-          </Button>
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {Boolean(status) ? (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                1
+              </span>
+            ) : null}
+          </button>
         </div>
-        <SearchInput
-          value={search}
-          onChange={(v) => setParam('search', v)}
-          placeholder="Search invoices…"
-          className="sm:max-w-xs"
-        />
-        <Select
-          value={status}
-          onChange={(e) => setParam('status', e.target.value)}
-          className="min-h-11 sm:w-48"
-          aria-label="Status filter"
-        >
-          <option value="">All statuses</option>
-          {INVOICE_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </Select>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
+              <ChevronLeft />
+            </Button>
+            <span className="min-w-32 text-center text-sm font-medium text-slate-700" aria-live="polite">
+              {periodLabel({ billingPeriod: { month, year } } as Invoice)}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Next month"
+              disabled={atCurrentMonth}
+              onClick={() => shiftMonth(1)}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+          <Select
+            value={status}
+            onChange={(e) => setParam('status', e.target.value)}
+            className="min-h-11"
+            aria-label="Status filter"
+          >
+            <option value="">All statuses</option>
+            {INVOICE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       <DataTable<Invoice>
@@ -164,6 +185,7 @@ export default function InvoicesPage() {
         onRetry={() => invoicesQuery.refetch()}
         emptyTitle="No invoices found"
         emptyMessage="Generate an invoice or adjust your filters."
+        emptyIcon={<Receipt className="size-6" />}
         emptyActionLabel="Generate invoice"
         onEmptyAction={() => setGenerateOpen(true)}
         renderCard={(inv) => (

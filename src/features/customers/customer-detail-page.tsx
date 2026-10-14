@@ -6,12 +6,14 @@ import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Pencil, Plus, ShoppingCart, Wallet } from 'lucide-react';
+import { Ellipsis, Pencil, Plus, ShoppingCart, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -36,10 +38,10 @@ import type { Product } from '@/types/product';
 
 const subscribeSchema = z.object({
   productId: z.string().min(1, 'Select a product'),
-  quantityPerDay: z.coerce.number().min(1, 'Quantity must be at least 1'),
-  pricePerUnit: z.coerce.number().min(0).optional(),
+  quantityPerDelivery: z.coerce.number().min(1, 'Quantity must be at least 1'),
+  customPrice: z.coerce.number().min(0).optional(),
   startDate: z.string().min(1, 'Start date is required'),
-  slot: z.enum(['morning', 'evening']).default('morning'),
+  deliverySlot: z.enum(['morning', 'evening']).default('morning'),
 });
 
 type SubscribeValues = z.infer<typeof subscribeSchema>;
@@ -62,12 +64,23 @@ function SubscribeDialog({ userId, open, onOpenChange }: { userId: string; open:
 
   const form = useForm<SubscribeValues>({
     resolver: zodResolver(subscribeSchema) as unknown as Resolver<SubscribeValues>,
-    defaultValues: { productId: '', quantityPerDay: 1, startDate: new Date().toISOString().slice(0, 10), slot: 'morning' },
+    defaultValues: { productId: '', quantityPerDelivery: 1, startDate: new Date().toISOString().slice(0, 10), deliverySlot: 'morning' },
   });
 
   const createSub = useMutation({
-    mutationFn: (values: SubscribeValues) =>
-      api.post<unknown>('/api/subscriptions/admin/create', { userId, ...values }),
+    mutationFn: (values: SubscribeValues) => {
+      const payload = {
+        userId,
+        productId: values.productId,
+        quantityPerDelivery: values.quantityPerDelivery,
+        customPrice: values.customPrice && values.customPrice > 0 ? values.customPrice : undefined,
+        startDate: values.startDate,
+        deliverySlot: values.deliverySlot,
+        deliverySchedule: 'daily',
+        customDays: [],
+      };
+      return api.post<unknown>('/api/subscriptions/admin/create', payload);
+    },
     onSuccess: () => {
       toast.success('Subscription created');
       queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all() });
@@ -91,17 +104,17 @@ function SubscribeDialog({ userId, open, onOpenChange }: { userId: string; open:
                 <option value="">Select product</option>
                 {products.map((p) => (
                   <option key={getId(p) || p.id} value={getId(p) || p.id}>
-                    {p.name} · {formatCurrency(p.price)}
+                    {p.name} · {formatCurrency((p as unknown as Record<string,unknown>).basePrice as number ?? p.price)}
                   </option>
                 ))}
               </Select>
             </FormField>
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Qty / day" required error={form.formState.errors.quantityPerDay?.message}>
-                <Input type="number" min={1} {...form.register('quantityPerDay')} />
+              <FormField label="Qty / delivery" required error={form.formState.errors.quantityPerDelivery?.message}>
+                <Input type="number" min={1} {...form.register('quantityPerDelivery')} />
               </FormField>
-              <FormField label="Price / unit" error={form.formState.errors.pricePerUnit?.message}>
-                <Input type="number" min={0} placeholder="Default price" {...form.register('pricePerUnit')} />
+              <FormField label="Price / unit" error={form.formState.errors.customPrice?.message}>
+                <Input type="number" min={0} placeholder="Default price" {...form.register('customPrice')} />
               </FormField>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -109,7 +122,7 @@ function SubscribeDialog({ userId, open, onOpenChange }: { userId: string; open:
                 <Input type="date" {...form.register('startDate')} />
               </FormField>
               <FormField label="Slot">
-                <Select {...form.register('slot')}>
+                <Select {...form.register('deliverySlot')}>
                   <option value="morning">Morning</option>
                   <option value="evening">Evening</option>
                 </Select>
@@ -241,11 +254,21 @@ export default function CustomerDetailPage() {
   }
 
   if (isLoading || !customer) {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col gap-4">
+          <PageHeader title="Customer" breadcrumbs={[{ label: 'Customers', path: '/customers' }, { label: 'Details' }]} />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-4">
         <PageHeader title="Customer" breadcrumbs={[{ label: 'Customers', path: '/customers' }, { label: 'Details' }]} />
         <Card>
-          <CardContent className="p-6 text-sm text-slate-500">{isLoading ? 'Loading…' : 'Customer not found.'}</CardContent>
+          <CardContent className="p-6 text-sm text-slate-500">Customer not found.</CardContent>
         </Card>
       </div>
     );
@@ -260,20 +283,44 @@ export default function CustomerDetailPage() {
         title={customer.name}
         breadcrumbs={[{ label: 'Customers', path: '/customers' }, { label: customer.name }]}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="min-h-11">
-              <Pencil aria-hidden /> Edit
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setSubscribeOpen(true)} className="min-h-11">
-              <Plus aria-hidden /> Subscribe
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setOrderOpen(true)} className="min-h-11">
-              <ShoppingCart aria-hidden /> New order
-            </Button>
-            <Button size="sm" onClick={() => setCollectOpen(true)} className="min-h-11">
-              <Wallet aria-hidden /> Collect
-            </Button>
-          </div>
+          <>
+            <div className="hidden flex-wrap gap-2 sm:flex">
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="min-h-11">
+                <Pencil aria-hidden /> Edit
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setSubscribeOpen(true)} className="min-h-11">
+                <Plus aria-hidden /> Subscribe
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setOrderOpen(true)} className="min-h-11">
+                <ShoppingCart aria-hidden /> New order
+              </Button>
+              <Button size="sm" onClick={() => setCollectOpen(true)} className="min-h-11">
+                <Wallet aria-hidden /> Collect
+              </Button>
+            </div>
+            <div className="flex gap-2 sm:hidden">
+              <Button size="sm" onClick={() => setCollectOpen(true)} className="min-h-11">
+                <Wallet aria-hidden /> Collect
+              </Button>
+              <DropdownMenu
+                trigger={
+                  <Button size="sm" variant="outline" className="min-h-11" aria-label="More actions">
+                    <Ellipsis aria-hidden /> More
+                  </Button>
+                }
+              >
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Pencil className="size-4" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSubscribeOpen(true)}>
+                  <Plus className="size-4" /> Subscribe
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setOrderOpen(true)}>
+                  <ShoppingCart className="size-4" /> New order
+                </DropdownMenuItem>
+              </DropdownMenu>
+            </div>
+          </>
         }
       />
 
@@ -305,23 +352,6 @@ export default function CustomerDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <Select value={String(month)} onChange={(e) => setMonth(Number(e.target.value))} aria-label="Ledger month">
-          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-            <option key={m} value={String(i + 1)}>
-              {m}
-            </option>
-          ))}
-        </Select>
-        <Select value={String(year)} onChange={(e) => setYear(Number(e.target.value))} aria-label="Ledger year">
-          {[now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
-            <option key={y} value={String(y)}>
-              {y}
-            </option>
-          ))}
-        </Select>
-      </div>
-
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
@@ -330,6 +360,22 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="balance">Balance</TabsTrigger>
         </TabsList>
         <TabsContent value="ledger">
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:max-w-md">
+            <Select value={String(month)} onChange={(e) => setMonth(Number(e.target.value))} aria-label="Ledger month">
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                <option key={m} value={String(i + 1)}>
+                  {m}
+                </option>
+              ))}
+            </Select>
+            <Select value={String(year)} onChange={(e) => setYear(Number(e.target.value))} aria-label="Ledger year">
+              {[now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </Select>
+          </div>
           <CustomerPaymentsTab userId={getId(customer)} month={month} year={year} />
         </TabsContent>
         <TabsContent value="orders">
@@ -339,13 +385,7 @@ export default function CustomerDetailPage() {
           <CustomerSubscriptionsTab userId={getId(customer)} />
         </TabsContent>
         <TabsContent value="balance">
-          <CustomerBalanceTab
-            userId={getId(customer)}
-            month={month}
-            year={year}
-            onMonthChange={setMonth}
-            onYearChange={setYear}
-          />
+          <CustomerBalanceTab userId={getId(customer)} />
         </TabsContent>
       </Tabs>
 
@@ -380,11 +420,6 @@ export default function CustomerDetailPage() {
       <QuickOrderDialog userId={getId(customer)} open={orderOpen} onOpenChange={setOrderOpen} />
       <CollectPaymentDialog userId={getId(customer)} open={collectOpen} onOpenChange={setCollectOpen} />
       <AdjustBalanceDialog userId={getId(customer)} open={adjustOpen} onOpenChange={setAdjustOpen} />
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={() => setAdjustOpen(true)} className="min-h-11">
-          Adjust balance
-        </Button>
-      </div>
     </div>
   );
 }

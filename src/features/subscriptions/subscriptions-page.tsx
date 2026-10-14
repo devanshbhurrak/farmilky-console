@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -92,7 +92,7 @@ export default function SubscriptionsPage() {
       cell: (s) => (
         <div>
           <div className="font-medium text-slate-900">{getName(s.userId, s.customerName ?? '—')}</div>
-          <div className="text-xs text-slate-500">{getPhone(s.userId) || '—'}</div>
+          <div className="text-xs text-slate-500">{getPhone(s.userId) || s.customerPhone || '—'}</div>
         </div>
       ),
     },
@@ -102,14 +102,18 @@ export default function SubscriptionsPage() {
         <div>
           <div className="font-medium text-slate-900">{getName(s.productId, s.productName ?? '—')}</div>
           <div className="text-xs text-slate-500">
-            {s.quantityPerDay}/day · {titleCase(s.deliverySchedule)}
+            {s.quantityPerDelivery ?? s.quantityPerDay}/delivery · {titleCase(s.deliverySchedule)}
           </div>
         </div>
       ),
     },
     {
       header: 'Daily value',
-      cell: (s) => formatCurrency(s.totalPricePerDay ?? s.quantityPerDay * s.pricePerUnit),
+      cell: (s) => {
+        const qty = s.quantityPerDelivery ?? s.quantityPerDay ?? 0;
+        const rate = s.pricePerPacket ?? s.pricePerUnit ?? 0;
+        return formatCurrency(s.totalPricePerDelivery ?? s.totalPricePerDay ?? qty * rate);
+      },
     },
     {
       header: 'Status',
@@ -193,6 +197,7 @@ export default function SubscriptionsPage() {
         onRetry={() => listQuery.refetch()}
         emptyTitle="No subscriptions"
         emptyMessage="No subscriptions match your filters."
+        emptyIcon={<Repeat className="size-6" />}
         emptyActionLabel="New subscription"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(s) => (

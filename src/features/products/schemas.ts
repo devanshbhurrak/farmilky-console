@@ -41,13 +41,13 @@ export const productSchema = z.object({
   description: z.string().trim().optional().default(''),
   category: z.enum(PRODUCT_CATEGORIES),
   unit: z.enum(PRODUCT_UNITS),
-  price: z.coerce.number().min(0, 'Price cannot be negative'),
+  basePrice: z.coerce.number().min(0, 'Price cannot be negative'),
   stock: z.preprocess(
     emptyToUndefined,
     z.coerce.number().min(0, 'Stock cannot be negative').optional(),
   ),
   fatContent: z.string().trim().optional().default(''),
-  image: imageSchema,
+  imageUrl: imageSchema,
   variants: z.array(productVariantSchema).default([]),
   isAvailable: z.boolean().default(true),
 });

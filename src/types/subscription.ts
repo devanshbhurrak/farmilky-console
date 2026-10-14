@@ -7,23 +7,33 @@ export interface Subscription {
   id: string;
   userId: string | { id: string; name: string; phone?: string | null; email?: string | null };
   customerName?: string;
-  productId: string | { id: string; name: string; price?: number; unit?: string; image?: string | null };
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  productId: string | { id: string; name: string; price?: number; basePrice?: number | null; unit?: string; image?: string | null; imageUrl?: string | null };
   productName?: string;
   variantId?: string | null;
   variantLabel?: string | null;
-  quantityPerDay: number;
-  pricePerUnit: number;
-  totalPricePerDay: number;
+  quantityPerDelivery: number;
+  pricePerPacket: number;
+  totalPricePerDelivery: number;
   status: SubscriptionStatus;
   deliverySchedule: ScheduleType;
   customDays?: string[];
-  slot?: DeliverySlot | string;
+  deliverySlot?: DeliverySlot | string;
   startDate: string;
   pauseFrom?: string | null;
   pauseUntil?: string | null;
   pendingAmount?: number;
+  scheduledChangeDate?: string | null;
+  scheduledQty?: number | null;
+  scheduledPrice?: number | null;
   createdAt: string;
   updatedAt?: string;
+  // Backward compatibility aliases
+  quantityPerDay?: number;
+  pricePerUnit?: number;
+  totalPricePerDay?: number;
+  slot?: DeliverySlot | string;
 }
 
 export interface DeliveryHistoryEntry {
@@ -51,4 +61,4 @@ export interface SubscriptionListParams {
 
 export const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = ['active', 'paused', 'cancelled'];
 export const SCHEDULE_TYPES: ScheduleType[] = ['daily', 'alternate', 'weekly', 'custom'];
-export const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

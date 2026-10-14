@@ -34,9 +34,9 @@ export interface RecordBalanceAdjustmentInput {
 
 export const balancesApi = {
   list: (params?: BalanceListParams) =>
-    api.get<PaginatedResponse<BalanceSummary> | { success: boolean; data: unknown }>(
-      '/api/transactions/balances',
-      { partyType: 'customer', ...(params as Record<string, string | number | boolean | null | undefined>) },
+    api.get<PaginatedResponse<BalanceSummary>>(
+      '/api/users/admin/all',
+      { role: 'customer', ...(params as Record<string, string | number | boolean | null | undefined>) },
     ),
 
   updateTransaction: (id: string, data: UpdateTransactionInput) =>

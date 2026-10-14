@@ -34,8 +34,7 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
       data: {
         effectiveDate,
         deliverySchedule: newSchedule,
-        quantityPerDay: Number(newQty) || undefined,
-        slot: newSlot,
+        scheduledQty: Number(newQty) || undefined,
       },
     });
   };
@@ -50,7 +49,7 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
           <span className="text-slate-600">Current:</span>
           <Badge variant="info">{titleCase(subscription.deliverySchedule)}</Badge>
           <span className="text-slate-600">
-            {subscription.quantityPerDay}/day · {titleCase(typeof subscription.slot === 'string' ? subscription.slot : '')}
+            {subscription.quantityPerDelivery ?? subscription.quantityPerDay}/delivery · {titleCase(typeof (subscription.deliverySlot ?? subscription.slot) === 'string' ? (subscription.deliverySlot ?? subscription.slot) as string : '')}
           </span>
         </div>
 
@@ -59,7 +58,7 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
             <Badge variant="warning">Pending change</Badge>
             <span className="text-slate-700">
               {pending.deliverySchedule ? titleCase(pending.deliverySchedule) : ''}{' '}
-              {pending.quantityPerDay ? `· ${pending.quantityPerDay}/day` : ''}{' '}
+              {(pending.scheduledQty ?? pending.quantityPerDay ?? pending.quantityPerDelivery) ? `· ${pending.scheduledQty ?? pending.quantityPerDay ?? pending.quantityPerDelivery}/delivery` : ''}{' '}
               {pending.effectiveDate ? `from ${formatDate(pending.effectiveDate)}` : ''}
             </span>
             <Button variant="outline" size="sm" onClick={() => setConfirmCancel(true)}>
@@ -80,14 +79,8 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
               <option value="custom">Custom</option>
             </Select>
           </FormField>
-          <FormField label="New qty / day">
+          <FormField label="New qty / delivery">
             <Input type="number" min={1} value={newQty} onChange={(e) => setNewQty(e.target.value)} />
-          </FormField>
-          <FormField label="New slot">
-            <Select value={newSlot} onChange={(e) => setNewSlot(e.target.value)}>
-              <option value="morning">Morning</option>
-              <option value="evening">Evening</option>
-            </Select>
           </FormField>
         </div>
         <Button onClick={submit} disabled={!effectiveDate} loading={scheduleChange.isPending} className="min-h-11 self-start">

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Package, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -13,7 +13,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, getId, titleCase } from '@/lib/utils';
+import { cn, formatCurrency, getId, titleCase } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS, type Product, type ProductListParams } from '@/types/product';
 import { useCreateProduct, useDeleteProduct, useProducts, useUpdateProduct } from './hooks';
 import type { ProductInput } from './schemas';
@@ -34,10 +34,10 @@ function toProductInput(p: Product): ProductInput {
     description: p.description ?? '',
     category,
     unit,
-    price: p.price,
+    basePrice: Number(p.basePrice ?? p.price ?? 0),
     stock: p.stock ?? undefined,
     fatContent: p.fatContent ?? '',
-    image: p.image ?? '',
+    imageUrl: p.imageUrl ?? p.image ?? '',
     variants: (p.variants ?? []).map((v) => ({
       label: v.label,
       quantity: v.quantity,
@@ -55,7 +55,7 @@ function toProductInput(p: Product): ProductInput {
 function effectivePrice(p: Product): number {
   const variants = p.variants ?? [];
   const featured = variants.find((v) => v.isDefault) ?? variants[0];
-  return featured ? (featured.discountedPrice ?? featured.price) : p.price;
+  return featured ? (featured.discountedPrice ?? featured.price) : Number(p.basePrice ?? p.price ?? 0);
 }
 
 export default function ProductsPage() {
@@ -85,6 +85,7 @@ export default function ProductsPage() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Product | null>(null);
   const [deleting, setDeleting] = React.useState<Product | null>(null);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const updateUrl = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
@@ -130,9 +131,9 @@ export default function ProductsPage() {
       header: 'Product',
       cell: (p) => (
         <div className="flex items-center gap-3">
-          {p.image ? (
+          {(p.imageUrl ?? p.image) ? (
             <img
-              src={p.image}
+              src={p.imageUrl ?? p.image ?? ''}
               alt={p.name}
               loading="lazy"
               className="size-10 shrink-0 rounded-lg object-cover"
@@ -199,7 +200,7 @@ export default function ProductsPage() {
         description="Manage the product catalog and variants"
         actions={
           isAdmin ? (
-            <Button onClick={openCreate}>
+            <Button onClick={openCreate} className="min-h-11">
               <Plus />
               Add product
             </Button>
@@ -207,14 +208,32 @@ export default function ProductsPage() {
         }
       />
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <SearchInput
-          value={rawSearch}
-          onChange={(v) => updateUrl({ search: v, page: null })}
-          placeholder="Search products…"
-          className="sm:max-w-xs"
-        />
+      <div className="flex flex-col gap-3">
         <div className="flex gap-2">
+          <SearchInput
+            value={rawSearch}
+            onChange={(v) => updateUrl({ search: v, page: null })}
+            placeholder="Search products…"
+            className="flex-1"
+          />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              (category !== 'all' || availability !== 'all') && 'border-primary-300',
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {(category !== 'all' || availability !== 'all') ? (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                {[category !== 'all', availability !== 'all'].filter(Boolean).length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
           <Select
             value={category}
             onChange={(e) => updateUrl({ category: e.target.value === 'all' ? '' : e.target.value, page: null })}
@@ -253,6 +272,7 @@ export default function ProductsPage() {
         onRetry={() => refetch()}
         emptyTitle="No products found"
         emptyMessage="Try adjusting your search or filters."
+        emptyIcon={<Package className="size-6" />}
         emptyActionLabel={isAdmin ? 'Add product' : undefined}
         onEmptyAction={isAdmin ? openCreate : undefined}
         renderCard={(p) => <ProductCard product={p} />}

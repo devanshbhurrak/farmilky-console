@@ -40,7 +40,7 @@ export const milkApi = {
   },
   missing: async (from: string, to: string): Promise<string[]> => {
     try {
-      const res = await api.get<unknown>('/api/milk-collections/missing', { from, to });
+      const res = await api.get<unknown>('/api/milk-collections/missing', { startDate: from, endDate: to });
       const unwrapped = unwrapData<unknown>(res as { success?: boolean; data?: unknown });
       if (Array.isArray(unwrapped)) return unwrapped.map((d) => String(d));
       if (unwrapped && typeof unwrapped === 'object') {

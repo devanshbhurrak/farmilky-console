@@ -44,6 +44,5 @@ export interface OutcomeInput {
   actualQuantity?: number;
   reason?: string;
   notes?: string;
-  paymentMode?: string;
-  subscriptionId?: string;
+  deliveryDate?: string;
 }

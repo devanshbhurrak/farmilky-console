@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { SlidersHorizontal, Wallet } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,8 +12,8 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { StatCard } from '@/components/data/stat-card';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -22,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField } from '@/components/form/form-field';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
+  cn,
   formatCurrency,
   formatDate,
   getErrorMessage,
@@ -186,6 +188,7 @@ export default function PaymentsPage() {
     setSearchParams(next, { replace: true });
   };
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [collectCustomer, setCollectCustomer] = useState<Customer | null>(null);
   const [adjustCustomer, setAdjustCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
@@ -342,44 +345,49 @@ export default function PaymentsPage() {
         <TabsContent value="customer">
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-slate-500">Total due</p>
-                  <p className="text-lg font-semibold text-red-600">{formatCurrency(customerStats.due)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-slate-500">Total advances</p>
-                  <p className="text-lg font-semibold text-emerald-600">{formatCurrency(customerStats.advances)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-slate-500">Customers</p>
-                  <p className="text-lg font-semibold text-slate-900">{customerStats.count}</p>
-                </CardContent>
-              </Card>
+              <StatCard label="Total due" value={formatCurrency(customerStats.due)} valueClassName="text-red-600" />
+              <StatCard label="Total advances" value={formatCurrency(customerStats.advances)} valueClassName="text-emerald-600" />
+              <StatCard label="Customers" value={customerStats.count} />
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <SearchInput
-                value={search}
-                onChange={(v) => setParam('search', v)}
-                placeholder="Search customers…"
-                className="sm:max-w-xs"
-              />
-              <Select
-                value={balanceFilter}
-                onChange={(e) => setParam('balance', e.target.value)}
-                className="min-h-11 sm:w-48"
-                aria-label="Balance filter"
-              >
-                <option value="all">All balances</option>
-                <option value="due">Due</option>
-                <option value="advance">Advance</option>
-                <option value="zero">Settled</option>
-              </Select>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <SearchInput
+                  value={search}
+                  onChange={(v) => setParam('search', v)}
+                  placeholder="Search customers…"
+                  className="flex-1"
+                />
+                <button
+                  onClick={() => setFiltersOpen(!filtersOpen)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+                    filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                    balanceFilter !== 'all' && 'border-primary-300',
+                  )}
+                >
+                  <SlidersHorizontal className="size-4" />
+                  Filters
+                  {balanceFilter !== 'all' ? (
+                    <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                      1
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+              <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', !filtersOpen && 'hidden md:grid')}>
+                <Select
+                  value={balanceFilter}
+                  onChange={(e) => setParam('balance', e.target.value)}
+                  className="min-h-11"
+                  aria-label="Balance filter"
+                >
+                  <option value="all">All balances</option>
+                  <option value="due">Due</option>
+                  <option value="advance">Advance</option>
+                  <option value="zero">Settled</option>
+                </Select>
+              </div>
             </div>
 
             <DataTable<Customer>
@@ -391,6 +399,7 @@ export default function PaymentsPage() {
               onRetry={() => customersQuery.refetch()}
               emptyTitle="No customers found"
               emptyMessage="Try adjusting your search or balance filter."
+              emptyIcon={<Wallet className="size-6" />}
               renderCard={(c) => (
                 <CustomerBalanceCard
                   row={{ ...c, balance: balanceOfCustomer(c) }}
@@ -410,18 +419,8 @@ export default function PaymentsPage() {
         <TabsContent value="supplier">
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-slate-500">To pay (outstanding)</p>
-                  <p className="text-lg font-semibold text-red-600">{formatCurrency(supplierStats.toPay)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-slate-500">Total paid</p>
-                  <p className="text-lg font-semibold text-emerald-600">{formatCurrency(supplierStats.totalPaid)}</p>
-                </CardContent>
-              </Card>
+              <StatCard label="To pay (outstanding)" value={formatCurrency(supplierStats.toPay)} valueClassName="text-red-600" />
+              <StatCard label="Total paid" value={formatCurrency(supplierStats.totalPaid)} valueClassName="text-emerald-600" />
             </div>
 
             <SearchInput
@@ -440,6 +439,7 @@ export default function PaymentsPage() {
               onRetry={() => suppliersQuery.refetch()}
               emptyTitle="No supplier payments found"
               emptyMessage="Record a supplier payment to get started."
+              emptyIcon={<Wallet className="size-6" />}
               emptyActionLabel="Record payment"
               onEmptyAction={() => setRecordSupplierOpen(true)}
               renderCard={(p) => <SupplierPaymentCard payment={p} />}
@@ -470,14 +470,16 @@ export default function PaymentsPage() {
       </Sheet>
 
       <Dialog open={Boolean(adjustCustomer)} onOpenChange={(open) => { if (!open) setAdjustCustomer(null); }}>
-        <DialogHeader>
-          <DialogTitle>Adjust balance{adjustCustomer ? ` — ${adjustCustomer.name}` : ''}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          {adjustCustomer ? (
-            <AdjustCustomerForm customer={adjustCustomer} onSuccess={() => setAdjustCustomer(null)} />
-          ) : null}
-        </DialogBody>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust balance{adjustCustomer ? ` — ${adjustCustomer.name}` : ''}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {adjustCustomer ? (
+              <AdjustCustomerForm customer={adjustCustomer} onSuccess={() => setAdjustCustomer(null)} />
+            ) : null}
+          </DialogBody>
+        </DialogContent>
       </Dialog>
 
       <Sheet open={Boolean(historyCustomer)} onOpenChange={(open) => { if (!open) { setHistoryCustomer(null); setEditingEntry(null); } }}>
@@ -530,14 +532,16 @@ export default function PaymentsPage() {
       </Sheet>
 
       <Dialog open={Boolean(editingEntry)} onOpenChange={(open) => { if (!open) setEditingEntry(null); }}>
-        <DialogHeader>
-          <DialogTitle>Edit entry</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          {editingEntry ? (
-            <EditPassbookEntryForm entry={editingEntry} onSuccess={() => setEditingEntry(null)} />
-          ) : null}
-        </DialogBody>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit entry</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {editingEntry ? (
+              <EditPassbookEntryForm entry={editingEntry} onSuccess={() => setEditingEntry(null)} />
+            ) : null}
+          </DialogBody>
+        </DialogContent>
       </Dialog>
 
       <ConfirmDialog

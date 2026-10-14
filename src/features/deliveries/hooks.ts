@@ -58,7 +58,7 @@ export function useRecordOutcome() {
     }: {
       kind: 'subscription' | 'order';
       id: string;
-      data: DeliveryOutcomeInput & { subscriptionId?: string; deliveryDate?: string };
+      data: DeliveryOutcomeInput;
     }) =>
       kind === 'order'
         ? deliveriesApi.recordOrderOutcome(id, data)
@@ -90,7 +90,7 @@ export function useDeliveryBoardSSE(enabled: boolean): void {
     if (!enabled) return;
     let source: EventSource | null = null;
     try {
-      source = new EventSource(`${API_BASE}/api/sse`, { withCredentials: true } as EventSourceInit);
+      source = new EventSource(`${API_BASE}/api/sse/manifest`, { withCredentials: true } as EventSourceInit);
       const handler = () => {
         queryClient.invalidateQueries({ queryKey: ['subscriptions', 'delivery-board'] });
       };

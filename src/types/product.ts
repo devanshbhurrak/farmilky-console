@@ -17,9 +17,11 @@ export interface Product {
   description?: string | null;
   category: string;
   unit: string;
-  price: number;
+  basePrice?: number | null;
+  price?: number;
   stock?: number | null;
   fatContent?: string | null;
+  imageUrl?: string | null;
   image?: string | null;
   isAvailable: boolean;
   variants?: ProductVariant[];

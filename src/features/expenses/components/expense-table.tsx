@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Landmark, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -126,6 +126,7 @@ export function ExpenseTable({
       onRetry={onRetry}
       emptyTitle="No expenses found"
       emptyMessage="Try adjusting your search or filters."
+      emptyIcon={<Landmark className="size-6" />}
       renderCard={renderExpenseCard}
       page={page}
       totalPages={totalPages}

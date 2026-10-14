@@ -7,14 +7,17 @@ import type { Product } from '@/types/product';
 export function ProductCard({ product }: { product: Product }) {
   const variants = product.variants ?? [];
   const featured = variants.find((v) => v.isDefault) ?? variants[0];
-  const price = featured ? (featured.discountedPrice ?? featured.price) : product.price;
+  const price = featured
+    ? (featured.discountedPrice ?? featured.price)
+    : (product.basePrice ?? product.price ?? 0);
+  const image = product.imageUrl ?? product.image;
 
   return (
     <Card>
       <CardContent className="flex gap-3 p-4">
-        {product.image ? (
+        {image ? (
           <img
-            src={product.image}
+            src={image}
             alt={product.name}
             loading="lazy"
             className="size-14 shrink-0 rounded-lg object-cover"

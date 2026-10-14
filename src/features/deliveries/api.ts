@@ -17,8 +17,6 @@ export interface BoardOutcomeRequest {
   actualQuantity?: number;
   reason?: string;
   notes?: string;
-  paymentMode?: string;
-  subscriptionId?: string;
   deliveryDate?: string;
 }
 
@@ -47,7 +45,17 @@ export const deliveriesApi = {
   recordOrderOutcome: (id: string, data: BoardOutcomeRequest) =>
     api.post<unknown>(`/api/orders/admin/${id}/delivery-outcome`, data, { idempotent: true }),
   instantDelivery: (data: InstantDeliveryRequest) =>
-    api.post<unknown>('/api/orders/admin/instant-delivery', data, { idempotent: true }),
+    // Backend instantDeliverySchema expects userId + paymentMethod; items only
+    // need productId + quantity (price is resolved server-side).
+    api.post<unknown>(
+      '/api/orders/admin/instant-delivery',
+      {
+        userId: data.customerId,
+        items: data.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        paymentMethod: data.paymentMode ?? 'COD',
+      },
+      { idempotent: true },
+    ),
   areasLite: () => api.get<unknown>('/api/areas', { limit: 100 }),
   productsLite: () => api.get<unknown>('/api/products', { limit: 100 }),
 };

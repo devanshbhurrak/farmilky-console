@@ -24,10 +24,10 @@ const EMPTY_DEFAULTS: ProductInput = {
   description: '',
   category: 'milk',
   unit: 'L',
-  price: 0,
+  basePrice: 0,
   stock: undefined,
   fatContent: '',
-  image: '',
+  imageUrl: '',
   variants: [],
   isAvailable: true,
 };
@@ -83,15 +83,15 @@ export function ProductForm({ defaultValues, onSubmit, submitting }: ProductForm
             </Select>
           </FormField>
         </div>
-        <FormField label="Image URL" hint="Leave blank for no image" error={errors.image?.message}>
-          <Input placeholder="https://…" inputMode="url" {...register('image')} />
+        <FormField label="Image URL" hint="Leave blank for no image" error={errors.imageUrl?.message}>
+          <Input placeholder="https://…" inputMode="url" {...register('imageUrl')} />
         </FormField>
       </FormSection>
 
       <FormSection title="Pricing & stock">
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Price" required error={errors.price?.message}>
-            <Input type="number" min={0} step="any" placeholder="0" {...register('price')} />
+          <FormField label="Price" required error={errors.basePrice?.message}>
+            <Input type="number" min={0} step="any" placeholder="0" {...register('basePrice')} />
           </FormField>
           <FormField label="Stock" error={errors.stock?.message}>
             <Input type="number" min={0} step="1" placeholder="Optional" {...register('stock')} />

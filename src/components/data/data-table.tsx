@@ -22,6 +22,7 @@ interface DataTableProps<T> {
   onRetry?: () => void;
   emptyTitle?: string;
   emptyMessage?: string;
+  emptyIcon?: React.ReactNode;
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
   renderCard?: (item: T) => React.ReactNode;
@@ -50,6 +51,7 @@ export function DataTable<T>({
   onRetry,
   emptyTitle = 'No results found',
   emptyMessage = 'Try adjusting your search or filters.',
+  emptyIcon,
   emptyActionLabel,
   onEmptyAction,
   renderCard,
@@ -77,6 +79,7 @@ export function DataTable<T>({
   if (data.length === 0) {
     return (
       <EmptyState
+        icon={emptyIcon}
         title={emptyTitle}
         message={emptyMessage}
         actionLabel={emptyActionLabel}
@@ -103,7 +106,7 @@ export function DataTable<T>({
           renderCard ? 'hidden md:block' : 'block',
         )}
       >
-        <table className="w-full min-w-160 border-collapse text-left text-sm">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               {columns.map((col) => (

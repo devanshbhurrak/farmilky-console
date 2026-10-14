@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/data/status-badge';
 import { formatCurrency, formatDate, formatDateTime, getId, getName, shortId } from '@/lib/utils';
 import { useOrder, useUpdateOrder } from './hooks';
@@ -43,11 +44,24 @@ export default function OrderDetailPage() {
   }
 
   if (isLoading || !order) {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col gap-4">
+          <PageHeader title="Order" breadcrumbs={[{ label: 'Orders', path: '/orders' }, { label: 'Details' }]} />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-4">
         <PageHeader title="Order" breadcrumbs={[{ label: 'Orders', path: '/orders' }, { label: 'Details' }]} />
         <Card>
-          <CardContent className="p-6 text-sm text-slate-500">{isLoading ? 'Loading…' : 'Order not found.'}</CardContent>
+          <CardContent className="p-6 text-sm text-slate-500">Order not found.</CardContent>
         </Card>
       </div>
     );
@@ -72,11 +86,11 @@ export default function OrderDetailPage() {
         }
       />
 
-      <Card className="bg-primary-600 text-white">
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <Card className="border-primary-200 bg-primary-50">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm text-white/80">Total</p>
-            <p className="text-3xl font-bold">{formatCurrency(order.totalAmount)}</p>
+            <p className="text-sm text-primary-700">Total</p>
+            <p className="text-3xl font-bold text-primary-900">{formatCurrency(order.totalAmount)}</p>
           </div>
           <div className="flex gap-2">
             <StatusBadge status={orderStatusOf(order)} />
@@ -163,9 +177,13 @@ export default function OrderDetailPage() {
           <CardTitle>Timeline</CardTitle>
         </CardHeader>
         <CardContent>
-          <ol className="flex flex-col gap-2">
+          <ol className="relative flex flex-col gap-4 pl-6 before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px before:bg-slate-200">
             {timeline.map((t) => (
-              <li key={t.label} className="flex items-center justify-between gap-2 text-sm">
+              <li key={t.label} className="relative flex items-center justify-between gap-2 text-sm">
+                <span
+                  aria-hidden
+                  className={`absolute -left-6 top-1/2 size-2.5 -translate-y-1/2 rounded-full ring-4 ring-white ${t.value ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                />
                 <span className="font-medium text-slate-700">{t.label}</span>
                 <span className="text-slate-500">{t.value ? formatDateTime(t.value) : '—'}</span>
               </li>

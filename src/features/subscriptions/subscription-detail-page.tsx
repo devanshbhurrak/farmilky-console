@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Pencil } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Pencil, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/data/stat-card';
 import { PageHeader } from '@/components/layout/page-header';
 import { StatusBadge } from '@/components/data/status-badge';
 import { ErrorState } from '@/components/data/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetBody, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { formatCurrency, formatDate, getErrorMessage, getName, getPhone, titleCase } from '@/lib/utils';
 import { useSubscription, useSubscriptionHistory, useUpdateSubscription, useUpdateSubscriptionStatus } from './hooks';
@@ -34,8 +35,14 @@ export default function SubscriptionDetailPage() {
   const subscription = detailQuery.data;
 
   const stats = useMemo(() => {
+    const qty = subscription
+      ? (subscription.quantityPerDelivery ?? subscription.quantityPerDay ?? 0)
+      : 0;
+    const rate = subscription
+      ? (subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0)
+      : 0;
     const daily = subscription
-      ? (subscription.totalPricePerDay ?? subscription.quantityPerDay * subscription.pricePerUnit)
+      ? (subscription.totalPricePerDelivery ?? subscription.totalPricePerDay ?? qty * rate)
       : 0;
     const monthItems = currentHistory.data?.items ?? [];
     const delivered = monthItems.filter((e) => e.status === 'delivered').length;
@@ -100,6 +107,14 @@ export default function SubscriptionDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={subscription.status} />
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium whitespace-nowrap text-slate-700 transition-colors outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 [&_svg]:size-4 [&_svg]:shrink-0"
+              >
+                <Phone className="size-4" /> {phone}
+              </a>
+            )}
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="min-h-11">
               <Pencil /> Edit
             </Button>
@@ -107,20 +122,9 @@ export default function SubscriptionDetailPage() {
         }
       />
 
-      {phone && (
-        <a href={`tel:${phone}`} className="text-sm text-primary-700 hover:underline">
-          Call {customerName}: {phone}
-        </a>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
         {statCards.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4">
-              <div className="text-xs text-slate-500">{s.label}</div>
-              <div className="mt-1 text-base font-semibold text-slate-900">{s.value}</div>
-            </CardContent>
-          </Card>
+          <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
       </div>
 
@@ -138,12 +142,12 @@ export default function SubscriptionDetailPage() {
             <div className="font-medium">{titleCase(subscription.deliverySchedule)}</div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Qty / day</div>
-            <div className="font-medium">{subscription.quantityPerDay}</div>
+            <div className="text-xs text-slate-500">Qty / delivery</div>
+            <div className="font-medium">{subscription.quantityPerDelivery ?? subscription.quantityPerDay}</div>
           </div>
           <div>
             <div className="text-xs text-slate-500">Rate</div>
-            <div className="font-medium">{formatCurrency(subscription.pricePerUnit)}</div>
+            <div className="font-medium">{formatCurrency(subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0)}</div>
           </div>
           <div>
             <div className="text-xs text-slate-500">Daily total</div>
@@ -156,38 +160,36 @@ export default function SubscriptionDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        {subscription.status === 'active' && (
-          <Button variant="outline" onClick={() => setPendingStatus('paused')} className="min-h-11">
-            Pause
-          </Button>
-        )}
-        {subscription.status === 'paused' && (
-          <Button variant="outline" onClick={() => setPendingStatus('active')} className="min-h-11">
-            Resume
-          </Button>
-        )}
-        {subscription.status !== 'cancelled' && (
-          <Button variant="outline" onClick={() => setPendingStatus('cancelled')} className="min-h-11">
-            Cancel subscription
-          </Button>
-        )}
-      </div>
+      <Card>
+        <CardContent className="flex flex-wrap gap-2 p-4">
+          {subscription.status === 'active' && (
+            <Button variant="outline" onClick={() => setPendingStatus('paused')} className="min-h-11">
+              Pause
+            </Button>
+          )}
+          {subscription.status === 'paused' && (
+            <Button variant="outline" onClick={() => setPendingStatus('active')} className="min-h-11">
+              Resume
+            </Button>
+          )}
+          {subscription.status !== 'cancelled' && (
+            <Button variant="outline" onClick={() => setPendingStatus('cancelled')} className="min-h-11">
+              Cancel subscription
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <DeliveryHistory subscriptionId={id as string} startMonth={subscription.startDate?.slice(0, 7)} />
 
       <ScheduleConfig subscription={subscription} />
 
-      <Link to="/subscriptions" className="text-sm text-primary-700 hover:underline">
-        ← Back to subscriptions
-      </Link>
-
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
-        <SheetBody>
+        <SheetContent side="bottom">
           <SheetHeader>
             <SheetTitle>Edit subscription</SheetTitle>
           </SheetHeader>
-          <div className="mt-4">
+          <SheetBody>
             <SubscriptionForm
               defaultValues={{
                 userId:
@@ -199,19 +201,19 @@ export default function SubscriptionDetailPage() {
                     ? subscription.productId
                     : (subscription.productId.id ?? ''),
                 variantId: subscription.variantId ?? undefined,
-                quantityPerDay: subscription.quantityPerDay,
-                pricePerUnit: subscription.pricePerUnit,
+                quantityPerDelivery: subscription.quantityPerDelivery ?? subscription.quantityPerDay ?? 1,
+                customPrice: subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0,
                 startDate: subscription.startDate?.slice(0, 10) ?? '',
                 deliverySchedule: subscription.deliverySchedule,
                 customDays: subscription.customDays ?? [],
-                slot:
-                  subscription.slot === 'evening' ? 'evening' : 'morning',
+                deliverySlot:
+                  ((subscription.deliverySlot ?? subscription.slot) === 'evening') ? 'evening' : 'morning',
               }}
               onSubmit={handleEdit}
               submitting={updateMutation.isPending}
             />
-          </div>
-        </SheetBody>
+          </SheetBody>
+        </SheetContent>
       </Sheet>
 
       <ConfirmDialog

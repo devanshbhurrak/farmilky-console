@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal, Users } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { queryKeys } from '@/lib/query-keys';
-import { formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useCreateCustomer, useCustomers } from './hooks';
 import { customersApi } from './api';
@@ -34,6 +34,7 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const search = params.get('search') ?? '';
   const status = params.get('status') ?? 'all';
@@ -157,24 +158,44 @@ export default function CustomersPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search name, phone, email…" className="sm:col-span-2 lg:col-span-1" />
-        <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </Select>
-        <Select value={balanceFilter} onChange={(e) => update({ balance: e.target.value, page: '1' })} aria-label="Balance filter">
-          <option value="all">Any balance</option>
-          <option value="due">Due</option>
-          <option value="clear">Clear</option>
-        </Select>
-        <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort customers">
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="name">Name A–Z</option>
-          <option value="highest-due">Highest due</option>
-        </Select>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search name, phone, email…" className="flex-1" />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              (status !== 'all' || balanceFilter !== 'all') && 'border-primary-300',
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {(status !== 'all' || balanceFilter !== 'all') ? (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                {[status !== 'all', balanceFilter !== 'all'].filter(Boolean).length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+          <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={balanceFilter} onChange={(e) => update({ balance: e.target.value, page: '1' })} aria-label="Balance filter">
+            <option value="all">Any balance</option>
+            <option value="due">Due</option>
+            <option value="clear">Clear</option>
+          </Select>
+          <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort customers">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">Name A–Z</option>
+            <option value="highest-due">Highest due</option>
+          </Select>
+        </div>
       </div>
 
       <FilterBar
@@ -192,6 +213,7 @@ export default function CustomersPage() {
         onRetry={() => refetch()}
         emptyTitle="No customers found"
         emptyMessage="Try adjusting your search or filters, or add a new customer."
+        emptyIcon={<Users className="size-6" />}
         emptyActionLabel="New customer"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(c) => (

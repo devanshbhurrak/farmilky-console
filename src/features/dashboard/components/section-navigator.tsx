@@ -1,11 +1,26 @@
+import * as React from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown, ChevronUp, LayoutGrid } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { NAV_ITEMS } from '@/lib/navigation';
 
 export function SectionNavigator() {
+  const [open, setOpen] = React.useState(false);
   const items = NAV_ITEMS.filter((i) => i.adminOnly && i.path !== '/');
+  if (!open) {
+    return (
+      <Button variant="outline" onClick={() => setOpen(true)} className="min-h-11 w-full sm:w-auto">
+        <LayoutGrid /> View all modules <ChevronDown />
+      </Button>
+    );
+  }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="flex flex-col gap-3">
+      <Button variant="outline" onClick={() => setOpen(false)} className="min-h-11 w-full sm:w-auto">
+        <LayoutGrid /> Hide modules <ChevronUp />
+      </Button>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
       {items.map((item) => (
         <Link key={item.path} to={item.path} className="rounded-xl focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:outline-none">
           <Card className="transition-shadow hover:shadow-md">
@@ -18,6 +33,7 @@ export function SectionNavigator() {
           </Card>
         </Link>
       ))}
+      </div>
     </div>
   );
 }

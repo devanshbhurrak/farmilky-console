@@ -25,6 +25,9 @@ export function TopBar() {
           <p className="text-xs text-slate-500">{user?.phone ?? user?.email ?? user?.role}</p>
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate(user?.role === 'admin' ? '/permissions' : '/agent/profile')}>
+          <User className="size-4" /> Profile
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
             logout();
@@ -33,9 +36,6 @@ export function TopBar() {
           danger
         >
           <LogOut className="size-4" /> Sign out
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate(user?.role === 'admin' ? '/permissions' : '/agent/profile')}>
-          <User className="size-4" /> Profile
         </DropdownMenuItem>
       </DropdownMenu>
     </header>

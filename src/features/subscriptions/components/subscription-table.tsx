@@ -17,14 +17,17 @@ export function SubscriptionCard({
   onClick?: () => void;
 }) {
   const customer = getName(subscription.userId, subscription.customerName ?? '—');
-  const phone = getPhone(subscription.userId);
+  const phone = getPhone(subscription.userId) || subscription.customerPhone;
   const product = getName(subscription.productId, subscription.productName ?? '—');
-  const daily = subscription.totalPricePerDay ?? subscription.quantityPerDay * subscription.pricePerUnit;
+  const qty = subscription.quantityPerDelivery ?? subscription.quantityPerDay ?? 0;
+  const rate = subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0;
+  const daily = subscription.totalPricePerDelivery ?? subscription.totalPricePerDay ?? qty * rate;
   const standardRate =
     typeof subscription.productId === 'object' && subscription.productId !== null
-      ? (subscription.productId.price ?? subscription.pricePerUnit)
-      : subscription.pricePerUnit;
-  const isCustom = Number(subscription.pricePerUnit) !== Number(standardRate);
+      ? (subscription.productId.basePrice ?? subscription.productId.price ?? subscription.pricePerPacket ?? subscription.pricePerUnit)
+      : (subscription.pricePerPacket ?? subscription.pricePerUnit);
+  const isCustom = Number(subscription.pricePerPacket ?? subscription.pricePerUnit) !== Number(standardRate);
+  const slot = subscription.deliverySlot ?? subscription.slot;
 
   return (
     <Card
@@ -50,13 +53,13 @@ export function SubscriptionCard({
           </span>
           {phone && <span className="text-xs text-slate-500">{phone}</span>}
           <span className="text-sm text-slate-700">
-            {product} · {subscription.quantityPerDay}/day · {titleCase(subscription.deliverySchedule)}
+            {product} · {qty}/delivery · {titleCase(subscription.deliverySchedule)}
           </span>
           <span className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-slate-900">{formatCurrency(daily)}</span>
             {isCustom && <Badge variant="warning">CUSTOM</Badge>}
             <span className="text-xs text-slate-500">
-              {titleCase(typeof subscription.slot === 'string' ? subscription.slot : 'morning')} slot
+              {titleCase(typeof slot === 'string' ? slot : 'morning')} slot
             </span>
           </span>
         </button>

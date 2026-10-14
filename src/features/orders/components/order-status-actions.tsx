@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { Check, Truck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { FormField } from '@/components/form/form-field';
@@ -18,7 +17,6 @@ import { orderStatusOf } from './order-table';
 const STEPS = ['placed', 'confirmed', 'delivered'] as const;
 
 const outcomeSchema = z.object({
-  paymentMode: z.enum(['COD', 'online', 'upi', 'subscription_ledger']),
   notes: z.string().optional(),
 });
 
@@ -33,7 +31,7 @@ export function OrderStatusActions({ order }: { order: Order }) {
 
   const form = useForm<OutcomeValues>({
     resolver: zodResolver(outcomeSchema),
-    defaultValues: { paymentMode: 'COD', notes: '' },
+    defaultValues: { notes: '' },
   });
 
   const stepIndex = status === 'delivered' ? 2 : status === 'confirmed' ? 1 : 0;
@@ -43,7 +41,7 @@ export function OrderStatusActions({ order }: { order: Order }) {
   async function handleOutcome(values: OutcomeValues) {
     await outcome.mutateAsync({
       id: getId(order),
-      data: { outcome: 'delivered', paymentMode: values.paymentMode, notes: values.notes || undefined },
+      data: { status: 'delivered', notes: values.notes || undefined },
     });
     setOutcomeOpen(false);
   }
@@ -102,14 +100,6 @@ export function OrderStatusActions({ order }: { order: Order }) {
           </SheetHeader>
           <SheetBody>
             <form onSubmit={form.handleSubmit(handleOutcome)} className="flex flex-col gap-4">
-              <FormField label="Payment mode" required>
-                <Select {...form.register('paymentMode')}>
-                  <option value="COD">COD</option>
-                  <option value="upi">UPI</option>
-                  <option value="online">Online</option>
-                  <option value="subscription_ledger">Subscription ledger</option>
-                </Select>
-              </FormField>
               <FormField label="Notes">
                 <Input placeholder="Delivery notes…" {...form.register('notes')} />
               </FormField>

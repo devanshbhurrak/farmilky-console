@@ -31,7 +31,8 @@ interface LiteVariant {
 interface LiteProduct {
   id: string;
   name: string;
-  price: number;
+  basePrice?: number | null;
+  price?: number;
   unit?: string;
   variants?: LiteVariant[];
 }
@@ -56,7 +57,11 @@ export function SubscriptionForm({
   submitting,
   fixedCustomerId,
 }: {
-  defaultValues?: Partial<SubscriptionInput>;
+  defaultValues?: Partial<SubscriptionInput> & {
+    quantityPerDay?: number;
+    pricePerUnit?: number;
+    slot?: 'morning' | 'evening';
+  };
   onSubmit: (values: SubscriptionInput) => void;
   submitting?: boolean;
   fixedCustomerId?: string;
@@ -88,12 +93,15 @@ export function SubscriptionForm({
       userId: defaultValues?.userId ?? fixedCustomerId ?? '',
       productId: defaultValues?.productId ?? '',
       variantId: defaultValues?.variantId ?? undefined,
-      quantityPerDay: defaultValues?.quantityPerDay ?? 1,
-      pricePerUnit: defaultValues?.pricePerUnit ?? 0,
+      quantityPerDelivery:
+        defaultValues?.quantityPerDelivery ?? defaultValues?.quantityPerDay ?? 1,
+      customPrice:
+        defaultValues?.customPrice ?? defaultValues?.pricePerUnit ?? 0,
       startDate: defaultValues?.startDate ?? '',
       deliverySchedule: defaultValues?.deliverySchedule ?? 'daily',
       customDays: defaultValues?.customDays ?? [],
-      slot: defaultValues?.slot ?? 'morning',
+      deliverySlot:
+        defaultValues?.deliverySlot ?? defaultValues?.slot ?? 'morning',
     },
   });
 
@@ -105,8 +113,8 @@ export function SubscriptionForm({
 
   const productId = watch('productId');
   const variantId = watch('variantId');
-  const quantityPerDay = watch('quantityPerDay');
-  const pricePerUnit = watch('pricePerUnit');
+  const quantityPerDelivery = watch('quantityPerDelivery');
+  const customPrice = watch('customPrice');
   const schedule = watch('deliverySchedule');
   const customDays = watch('customDays') ?? [];
 
@@ -117,10 +125,13 @@ export function SubscriptionForm({
     0,
   );
   const defaultVariant = variants[defaultVariantIndex];
-  const defaultPrice = defaultVariant ? variantPrice(defaultVariant) : (selectedProduct?.price ?? 0);
+  const defaultPrice = defaultVariant
+    ? variantPrice(defaultVariant)
+    : Number(selectedProduct?.basePrice ?? selectedProduct?.price ?? 0);
   const unitHint = defaultVariant?.unit ?? selectedProduct?.unit;
-  const isCustomPrice = Number(pricePerUnit) !== Number(defaultPrice);
-  const dailyTotal = Number(quantityPerDay || 0) * Number(pricePerUnit || 0);
+  const isCustomPrice = Number(customPrice) > 0 && Number(customPrice) !== Number(defaultPrice);
+  const deliveryTotal =
+    Number(quantityPerDelivery || 0) * Number(customPrice || defaultPrice || 0);
 
   const handleProductChange = (nextProductId: string) => {
     setValue('productId', nextProductId, { shouldValidate: true });
@@ -133,10 +144,10 @@ export function SubscriptionForm({
     const dv = nextVariants[idx];
     if (dv) {
       setValue('variantId', variantIdOf(dv, idx));
-      setValue('pricePerUnit', variantPrice(dv), { shouldValidate: true });
+      setValue('customPrice', variantPrice(dv), { shouldValidate: true });
     } else if (next) {
       setValue('variantId', undefined as unknown as string);
-      setValue('pricePerUnit', next.price ?? 0, { shouldValidate: true });
+      setValue('customPrice', Number(next.basePrice ?? next.price ?? 0), { shouldValidate: true });
     }
   };
 
@@ -181,7 +192,7 @@ export function SubscriptionForm({
           <option value="">Select product</option>
           {products.map((p) => (
             <option key={getId(p)} value={getId(p)}>
-              {getName(p)} · {formatCurrency(p.price)}
+              {getName(p)} · {formatCurrency(p.basePrice ?? p.price ?? 0)}
             </option>
           ))}
         </Select>
@@ -199,7 +210,7 @@ export function SubscriptionForm({
                   type="button"
                   onClick={() => {
                     setValue('variantId', vid);
-                    setValue('pricePerUnit', variantPrice(v), { shouldValidate: true });
+                    setValue('customPrice', variantPrice(v), { shouldValidate: true });
                   }}
                   className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     active
@@ -217,24 +228,23 @@ export function SubscriptionForm({
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Qty / day" required error={errors.quantityPerDay?.message}>
-          <Input type="number" min={1} step="any" {...register('quantityPerDay')} />
+        <FormField label="Qty / delivery" required error={errors.quantityPerDelivery?.message}>
+          <Input type="number" min={1} step="any" {...register('quantityPerDelivery')} />
         </FormField>
         <FormField
           label="Price / unit"
-          required
-          error={errors.pricePerUnit?.message}
+          error={errors.customPrice?.message}
           hint={selectedProduct ? `Default ${formatCurrency(defaultPrice)}` : undefined}
         >
           <div className="flex items-center gap-2">
-            <Input type="number" min={0} step="any" {...register('pricePerUnit')} />
+            <Input type="number" min={0} step="any" {...register('customPrice')} />
             {selectedProduct && isCustomPrice && <Badge variant="warning">CUSTOM</Badge>}
           </div>
         </FormField>
       </div>
 
       <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        Daily total: <span className="font-semibold text-slate-900">{formatCurrency(dailyTotal)}</span>
+        Delivery total: <span className="font-semibold text-slate-900">{formatCurrency(deliveryTotal)}</span>
       </div>
 
       <FormField label="Start date" required error={errors.startDate?.message}>
@@ -250,8 +260,8 @@ export function SubscriptionForm({
             <option value="custom">Custom</option>
           </Select>
         </FormField>
-        <FormField label="Slot" error={errors.slot?.message}>
-          <Select {...register('slot')}>
+        <FormField label="Slot" error={errors.deliverySlot?.message}>
+          <Select {...register('deliverySlot')}>
             <option value="morning">Morning</option>
             <option value="evening">Evening</option>
           </Select>

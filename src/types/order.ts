@@ -11,6 +11,8 @@ export interface OrderItem {
   variantLabel?: string | null;
   quantity: number;
   price: number;
+  /** Backend returns unitPrice (numeric string) instead of price on order items */
+  unitPrice?: number | string;
   unit?: string;
   lineTotal?: number;
 }

@@ -27,7 +27,21 @@ export function useSubscriptions(params: SubscriptionListParams) {
     queryKey: queryKeys.subscriptions.list({ ...params }),
     queryFn: async () => {
       const res = await subscriptionsApi.list(params);
-      const { items, meta } = normalizeList<Subscription>(res);
+      const { items: rawItems, meta } = normalizeList<Subscription>(res);
+      // Backend returns { subscription: {...}, customerName, customerPhone } shaped objects
+      const items = rawItems.map((raw) => {
+        const r = raw as unknown as Record<string, unknown>;
+        if (r.subscription && typeof r.subscription === 'object') {
+          const sub = r.subscription as Record<string, unknown>;
+          return {
+            ...sub,
+            customerName: r.customerName ?? sub.customerName,
+            customerPhone: r.customerPhone ?? sub.customerPhone,
+            customerEmail: r.customerEmail ?? sub.customerEmail,
+          } as Subscription;
+        }
+        return raw;
+      });
       return { items, meta };
     },
     placeholderData: keepPreviousData,
@@ -153,8 +167,13 @@ export function useScheduleChange() {
       data,
     }: {
       id: string;
-      data: { effectiveDate: string; deliverySchedule?: string; quantityPerDay?: number; slot?: string };
-    }) => subscriptionsApi.scheduleChange(id, data),
+      data: { effectiveDate: string; deliverySchedule?: string; scheduledQty?: number; scheduledPrice?: number; quantityPerDay?: number; slot?: string };
+    }) => subscriptionsApi.scheduleChange(id, {
+      effectiveDate: data.effectiveDate,
+      scheduledQty: data.scheduledQty ?? data.quantityPerDay,
+      scheduledPrice: data.scheduledPrice,
+      deliverySchedule: data.deliverySchedule,
+    }),
     onSuccess: () => {
       invalidateSubscriptionQueries(queryClient);
       toast.success('Schedule change saved');

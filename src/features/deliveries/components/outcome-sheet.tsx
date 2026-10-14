@@ -22,11 +22,14 @@ export function OutcomeSheet({
   open,
   onOpenChange,
   onSuccess,
+  date,
 }: {
   entry: DeliveryBoardEntry | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Board date — prefills deliveryDate, which the subscription outcome endpoint requires. */
+  date?: string;
 }) {
   const recordOutcome = useRecordOutcome();
 
@@ -44,6 +47,8 @@ export function OutcomeSheet({
     );
   };
 
+  const kind = entry ? resolveTarget(entry).kind : 'subscription';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetBody>
@@ -53,7 +58,12 @@ export function OutcomeSheet({
           </SheetTitle>
         </SheetHeader>
         <div className="mt-4">
-          <OutcomeForm onSubmit={handleSubmit} submitting={recordOutcome.isPending} />
+          <OutcomeForm
+            kind={kind}
+            defaultValues={{ deliveryDate: date }}
+            onSubmit={handleSubmit}
+            submitting={recordOutcome.isPending}
+          />
         </div>
       </SheetBody>
     </Sheet>

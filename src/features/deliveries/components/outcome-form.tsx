@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/form/form-field';
+import { todayLocal } from '@/lib/utils';
 import { outcomeSchema } from '../schemas';
 import type { DeliveryOutcomeInput } from '../schemas';
 
@@ -13,11 +14,14 @@ export function OutcomeForm({
   defaultValues,
   onSubmit,
   submitting,
+  kind = 'subscription',
 }: {
   defaultValues?: Partial<DeliveryOutcomeInput>;
   onSubmit: (values: DeliveryOutcomeInput) => void;
   submitting?: boolean;
+  kind?: 'subscription' | 'order';
 }) {
+  const isOrder = kind === 'order';
   const form = useForm<DeliveryOutcomeInput>({
     resolver: zodResolver(outcomeSchema) as unknown as Resolver<DeliveryOutcomeInput>,
     defaultValues: {
@@ -25,13 +29,13 @@ export function OutcomeForm({
       actualQuantity: defaultValues?.actualQuantity,
       reason: defaultValues?.reason ?? '',
       notes: defaultValues?.notes ?? '',
-      paymentMode: defaultValues?.paymentMode ?? 'COD',
+      deliveryDate: defaultValues?.deliveryDate ?? todayLocal(),
     },
   });
 
   const { register, handleSubmit, watch, formState } = form;
   const status = watch('status');
-  const needsQty = status === 'partial' || status === 'extra';
+  const needsQty = !isOrder && (status === 'partial' || status === 'extra');
   const needsReason = status === 'failed' || status === 'skipped';
 
   return (
@@ -39,20 +43,26 @@ export function OutcomeForm({
       <FormField label="Status" required error={formState.errors.status?.message}>
         <Select {...register('status')}>
           <option value="delivered">Delivered</option>
-          <option value="partial">Partial</option>
-          <option value="extra">Extra</option>
+          {isOrder ? null : (
+            <>
+              <option value="partial">Partial</option>
+              <option value="extra">Extra</option>
+            </>
+          )}
           <option value="failed">Failed</option>
           <option value="skipped">Skipped</option>
         </Select>
       </FormField>
-      <FormField
-        label="Actual quantity"
-        required={needsQty}
-        error={formState.errors.actualQuantity?.message}
-        hint={needsQty ? 'Required for partial / extra' : undefined}
-      >
-        <Input type="number" min={0} step="any" {...register('actualQuantity')} />
-      </FormField>
+      {isOrder ? null : (
+        <FormField
+          label="Actual quantity"
+          required={needsQty}
+          error={formState.errors.actualQuantity?.message}
+          hint={needsQty ? 'Required for partial / extra' : undefined}
+        >
+          <Input type="number" min={0} step="any" {...register('actualQuantity')} />
+        </FormField>
+      )}
       <FormField
         label="Reason"
         required={needsReason}
@@ -64,14 +74,11 @@ export function OutcomeForm({
       <FormField label="Notes" error={formState.errors.notes?.message}>
         <Textarea {...register('notes')} placeholder="Optional notes" />
       </FormField>
-      <FormField label="Payment mode">
-        <Select {...register('paymentMode')}>
-          <option value="COD">COD</option>
-          <option value="online">Online</option>
-          <option value="upi">UPI</option>
-          <option value="subscription_ledger">Subscription ledger</option>
-        </Select>
-      </FormField>
+      {isOrder ? null : (
+        <FormField label="Delivery date" required error={formState.errors.deliveryDate?.message}>
+          <Input type="date" {...register('deliveryDate')} />
+        </FormField>
+      )}
       <Button type="submit" loading={submitting} className="min-h-11">
         Save outcome
       </Button>

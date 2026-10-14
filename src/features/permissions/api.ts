@@ -16,7 +16,7 @@ export const permissionsApi = {
     if (Array.isArray(unwrapped)) return unwrapped as PermissionDefinition[];
     if (unwrapped && typeof unwrapped === 'object') {
       const obj = unwrapped as Record<string, unknown>;
-      for (const key of ['permissions', 'registry', 'definitions']) {
+      for (const key of ['registry', 'definitions', 'permissions']) {
         if (Array.isArray(obj[key])) return obj[key] as PermissionDefinition[];
       }
     }

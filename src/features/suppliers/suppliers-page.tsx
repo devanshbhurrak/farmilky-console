@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
@@ -205,6 +205,7 @@ export default function SuppliersPage() {
         onRetry={() => refetch()}
         emptyTitle="No suppliers found"
         emptyMessage="Try adjusting your filters, or add a new supplier."
+        emptyIcon={<Truck className="size-6" />}
         emptyActionLabel="New supplier"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(s) => <SupplierCard supplier={s} onClick={(sup) => navigate(`/suppliers/${getId(sup)}`)} />}

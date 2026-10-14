@@ -11,8 +11,11 @@ function productName(s: Subscription): string {
 }
 
 function dailyValue(s: Subscription): number {
+  if (s.totalPricePerDelivery !== undefined && s.totalPricePerDelivery !== null) return Number(s.totalPricePerDelivery);
   if (s.totalPricePerDay !== undefined && s.totalPricePerDay !== null) return Number(s.totalPricePerDay);
-  return Number(s.quantityPerDay ?? 0) * Number(s.pricePerUnit ?? 0);
+  const qty = Number(s.quantityPerDelivery ?? s.quantityPerDay ?? 0);
+  const rate = Number(s.pricePerPacket ?? s.pricePerUnit ?? 0);
+  return qty * rate;
 }
 
 export function CustomerSubscriptionsTab({ userId }: { userId: string }) {
@@ -27,7 +30,7 @@ export function CustomerSubscriptionsTab({ userId }: { userId: string }) {
             {productName(s)}
           </Link>
           <p className="text-xs text-slate-500">
-            {s.quantityPerDay} / day{s.slot ? ` · ${s.slot}` : ''}
+            {s.quantityPerDelivery ?? s.quantityPerDay} / delivery{(s.deliverySlot ?? s.slot) ? ` · ${s.deliverySlot ?? s.slot}` : ''}
           </p>
         </div>
       ),
@@ -68,7 +71,7 @@ export function CustomerSubscriptionsTab({ userId }: { userId: string }) {
           <div>
             <p className="text-sm font-semibold text-slate-900">{productName(s)}</p>
             <p className="text-xs text-slate-500">
-              {s.quantityPerDay} / day{s.slot ? ` · ${s.slot}` : ''}
+              {s.quantityPerDelivery ?? s.quantityPerDay} / delivery{(s.deliverySlot ?? s.slot) ? ` · ${s.deliverySlot ?? s.slot}` : ''}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">

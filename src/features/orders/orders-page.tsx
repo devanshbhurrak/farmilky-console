@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, ShoppingCart, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { FormField } from '@/components/form/form-field';
-import { formatCurrency, formatDate, getErrorMessage, getId, todayLocal } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, getErrorMessage, getId, todayLocal } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useCreateOrder, useInstantDelivery, useOrders } from './hooks';
 import { OrderForm } from './components/order-form';
@@ -27,6 +27,7 @@ export default function OrdersPage() {
   const [params, setParams] = useSearchParams();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deliverImmediately, setDeliverImmediately] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const search = params.get('search') ?? '';
   const status = params.get('status') ?? 'all';
@@ -133,28 +134,48 @@ export default function OrdersPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search orders…" />
-        <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
-          <option value="all">All statuses</option>
-          <option value="placed">Placed</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="delivered">Delivered</option>
-          <option value="cancelled">Cancelled</option>
-        </Select>
-        <Select value={paymentStatus} onChange={(e) => update({ paymentStatus: e.target.value, page: '1' })} aria-label="Payment status filter">
-          <option value="all">Any payment</option>
-          <option value="pending">Pending</option>
-          <option value="paid">Paid</option>
-          <option value="failed">Failed</option>
-        </Select>
-        <Input type="date" value={from} max={todayLocal()} onChange={(e) => update({ from: e.target.value, page: '1' })} aria-label="From date" />
-        <Input type="date" value={to} max={todayLocal()} onChange={(e) => update({ to: e.target.value, page: '1' })} aria-label="To date" />
-        <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort orders">
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="amount-desc">Highest amount</option>
-        </Select>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search orders…" className="flex-1" />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              (status !== 'all' || paymentStatus !== 'all' || from || to) && 'border-primary-300',
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {(status !== 'all' || paymentStatus !== 'all' || from || to) ? (
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                {[status !== 'all', paymentStatus !== 'all', Boolean(from), Boolean(to)].filter(Boolean).length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5', !filtersOpen && 'hidden md:grid')}>
+          <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="placed">Placed</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+          <Select value={paymentStatus} onChange={(e) => update({ paymentStatus: e.target.value, page: '1' })} aria-label="Payment status filter">
+            <option value="all">Any payment</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="failed">Failed</option>
+          </Select>
+          <Input type="date" value={from} max={todayLocal()} onChange={(e) => update({ from: e.target.value, page: '1' })} aria-label="From date" />
+          <Input type="date" value={to} max={todayLocal()} onChange={(e) => update({ to: e.target.value, page: '1' })} aria-label="To date" />
+          <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort orders">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="amount-desc">Highest amount</option>
+          </Select>
+        </div>
       </div>
 
       <FilterBar
@@ -172,6 +193,7 @@ export default function OrdersPage() {
         onRetry={() => refetch()}
         emptyTitle="No orders found"
         emptyMessage="Try adjusting your filters, or create a new order."
+        emptyIcon={<ShoppingCart className="size-6" />}
         emptyActionLabel="New order"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(o) => <OrderCard order={o} onClick={(ord) => navigate(`/orders/${getId(ord)}`)} />}

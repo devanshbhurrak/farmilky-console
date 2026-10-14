@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { ClipboardList, Plus, SlidersHorizontal } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { FormField } from '@/components/form/form-field';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatDate, getErrorMessage, getId, getName, normalizeList, titleCase, todayLocal } from '@/lib/utils';
+import { cn, formatDate, getErrorMessage, getId, getName, normalizeList, titleCase, todayLocal } from '@/lib/utils';
 import type { Manifest } from '@/types/manifest';
 import { manifestsApi } from './api';
 import { useGenerateManifests, useManifests, useMyHistory } from './hooks';
@@ -30,6 +30,7 @@ export default function ManifestsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const date = searchParams.get('date') || todayLocal();
   const slot = searchParams.get('slot') || '';
@@ -127,40 +128,59 @@ export default function ManifestsPage() {
         }
       />
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        {isAdmin && (
-          <>
-            <FormField label="Date">
-              <Input type="date" value={date} onChange={(e) => updateParam('date', e.target.value)} />
-            </FormField>
-            <FormField label="Slot">
-              <Select aria-label="Slot filter" value={slot} onChange={(e) => updateParam('slot', e.target.value)}>
-                <option value="">All slots</option>
-                <option value="morning">Morning</option>
-                <option value="evening">Evening</option>
-              </Select>
-            </FormField>
-            <FormField label="Agent">
-              <Select aria-label="Agent filter" value={agentId} onChange={(e) => updateParam('agentId', e.target.value)}>
-                <option value="">All agents</option>
-                {(agentsQuery.data ?? []).map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-          </>
-        )}
-        <FormField label="Status">
+      {isAdmin ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-2">
+            <Input type="date" value={date} onChange={(e) => updateParam('date', e.target.value)} aria-label="Date filter" className="flex-1" />
+            <button
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
+                filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                (slot || agentId || status) && 'border-primary-300',
+              )}
+            >
+              <SlidersHorizontal className="size-4" />
+              Filters
+              {(slot || agentId || status) ? (
+                <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
+                  {[Boolean(slot), Boolean(agentId), Boolean(status)].filter(Boolean).length}
+                </span>
+              ) : null}
+            </button>
+          </div>
+          <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-4', !filtersOpen && 'hidden md:grid')}>
+            <Select aria-label="Slot filter" value={slot} onChange={(e) => updateParam('slot', e.target.value)}>
+              <option value="">All slots</option>
+              <option value="morning">Morning</option>
+              <option value="evening">Evening</option>
+            </Select>
+            <Select aria-label="Agent filter" value={agentId} onChange={(e) => updateParam('agentId', e.target.value)}>
+              <option value="">All agents</option>
+              {(agentsQuery.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Status filter" value={status} onChange={(e) => updateParam('status', e.target.value)}>
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Select aria-label="Status filter" value={status} onChange={(e) => updateParam('status', e.target.value)}>
             <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="completed">Completed</option>
           </Select>
-        </FormField>
-      </div>
+        </div>
+      )}
 
       <DataTable<Manifest>
         data={items}
@@ -171,6 +191,7 @@ export default function ManifestsPage() {
         onRetry={refetch}
         emptyTitle={isAdmin ? 'No manifests' : 'No history'}
         emptyMessage="Try adjusting your filters."
+        emptyIcon={<ClipboardList className="size-6" />}
         renderCard={(m) => <ManifestCard manifest={m} onClick={() => goDetail(m)} />}
         page={page}
         totalPages={meta?.totalPages ?? 0}

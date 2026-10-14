@@ -7,9 +7,17 @@ import type { Product } from '@/types/product';
 type RawRecord = Record<string, unknown>;
 
 function toOrder(raw: unknown): Order {
-  const o = (raw ?? {}) as RawRecord;
+  const root = (raw ?? {}) as RawRecord;
+  // Admin GET returns { order, items, attempts } — flatten before mapping.
+  const o: RawRecord =
+    root.order && typeof root.order === 'object'
+      ? { ...(root.order as RawRecord), items: root.items ?? (root.order as RawRecord).items }
+      : root;
   const items = (Array.isArray(o.items) ? o.items : []) as Order['items'];
-  const total = Number(o.totalAmount ?? o.total ?? items.reduce((s, it) => s + Number(it.quantity ?? 0) * Number(it.price ?? 0), 0));
+  // Backend serializes item price as `unitPrice` (numeric string).
+  const itemLineTotal = (it: Order['items'][number]) =>
+    Number(it.quantity ?? 0) * Number(it.price ?? it.unitPrice ?? 0);
+  const total = Number(o.totalAmount ?? o.total ?? items.reduce((s, it) => s + itemLineTotal(it), 0));
   return {
     id: getId(raw) || String(o.id ?? ''),
     userId: (o.userId ?? o.customer ?? '') as Order['userId'],
@@ -34,8 +42,8 @@ function toOrder(raw: unknown): Order {
 }
 
 export interface DeliveryOutcomeInput {
-  outcome?: string;
-  paymentMode?: string;
+  status: string;
+  reason?: string;
   notes?: string;
 }
 

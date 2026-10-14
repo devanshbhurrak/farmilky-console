@@ -14,7 +14,8 @@ import { useInstantDelivery } from '../hooks';
 interface LiteProduct {
   id: string;
   name: string;
-  price: number;
+  basePrice?: number | null;
+  price?: number;
 }
 
 interface ExtraRow {
@@ -55,7 +56,10 @@ export function ExtraProductsSection({
 
   const autofillPrice = (index: number, productId: string) => {
     const product = products.find((p) => getId(p) === productId);
-    updateRow(index, { productId, price: product ? String(product.price) : '' });
+    updateRow(index, {
+      productId,
+      price: product ? String(product.basePrice ?? product.price ?? '') : '',
+    });
   };
 
   const submit = () => {
@@ -86,7 +90,7 @@ export function ExtraProductsSection({
               <option value="">Select product</option>
               {products.map((p) => (
                 <option key={getId(p)} value={getId(p)}>
-                  {getName(p)} · {formatCurrency(p.price)}
+                  {getName(p)} · {formatCurrency(p.basePrice ?? p.price ?? 0)}
                 </option>
               ))}
             </Select>
