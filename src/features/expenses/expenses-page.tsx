@@ -1,18 +1,21 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/data/stat-card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FilterBar, type ActiveFilter } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { cn, formatCurrency, formatDate, getId, titleCase } from '@/lib/utils';
+import { formatCurrency, formatDate, getId, titleCase } from '@/lib/utils';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHODS,
@@ -61,6 +64,8 @@ export default function ExpensesPage() {
   const to = searchParams.get('to') ?? '';
   const debouncedSearch = useDebounce(rawSearch, 400);
 
+  const filters = useFilterDrawer({ category, from, to });
+
   const listParams: ExpenseListParams = {
     page,
     limit: PAGE_SIZE,
@@ -91,7 +96,6 @@ export default function ExpensesPage() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Expense | null>(null);
   const [deleting, setDeleting] = React.useState<Expense | null>(null);
-  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const updateUrl = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
@@ -119,26 +123,27 @@ export default function ExpensesPage() {
     }
   };
 
+  const createAction = React.useMemo(
+    () =>
+      isAdmin ? (
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setSheetOpen(true);
+          }}
+          className="px-3 py-1.5 text-sm"
+        >
+          <Plus aria-hidden />
+          Expense
+        </Button>
+      ) : null,
+    [isAdmin, setEditing, setSheetOpen],
+  );
+  useRegisterHeaderAction(createAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Expenses"
-        description="Track operational spending"
-        actions={
-          isAdmin ? (
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setSheetOpen(true);
-              }}
-              className="min-h-11"
-            >
-              <Plus />
-              Add expense
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Expenses" />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Total" value={formatCurrency(summary?.total ?? 0)} />
@@ -158,24 +163,9 @@ export default function ExpensesPage() {
             placeholder="Search expenses…"
             className="flex-1"
           />
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-              (category !== 'all' || from || to) && 'border-primary-300',
-            )}
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {(category !== 'all' || from || to) ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                {[category !== 'all', Boolean(from), Boolean(to)].filter(Boolean).length}
-              </span>
-            ) : null}
-          </button>
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
         </div>
-        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-3 md:grid">
           <Select
             value={category}
             onChange={(e) =>
@@ -204,6 +194,56 @@ export default function ExpensesPage() {
           />
         </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          updateUrl({
+            category: filters.draft.category === 'all' ? '' : filters.draft.category,
+            from: filters.draft.from,
+            to: filters.draft.to,
+            page: null,
+          });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ category: 'all', from: '', to: '' })}
+      >
+        <FormField label="Category">
+          <Select
+            value={filters.draft.category}
+            onChange={(e) => filters.setField('category', e.target.value)}
+            aria-label="Filter by category"
+          >
+            <option value="all">All categories</option>
+            {EXPENSE_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {titleCase(c)}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="From date">
+            <Input
+              type="date"
+              value={filters.draft.from}
+              onChange={(e) => filters.setField('from', e.target.value)}
+              aria-label="From date"
+            />
+          </FormField>
+          <FormField label="To date">
+            <Input
+              type="date"
+              value={filters.draft.to}
+              onChange={(e) => filters.setField('to', e.target.value)}
+              aria-label="To date"
+            />
+          </FormField>
+        </div>
+      </FilterDrawer>
+
       <FilterBar
         filters={activeFilters}
         onRemove={(key) => updateUrl({ [key]: '', page: null })}

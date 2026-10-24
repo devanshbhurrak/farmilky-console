@@ -25,7 +25,7 @@ export default function AgentProfilePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="My profile" description="Your account and delivery assignment" />
+      <PageHeader title="My profile" />
 
       <Card>
         <CardContent className="flex flex-col items-center gap-3 p-6 text-center sm:flex-row sm:text-left">

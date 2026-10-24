@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { queryClient } from '@/lib/query-client';
 import { AuthProvider } from '@/features/auth/auth-provider';
 import { ErrorBoundary } from '@/components/feedback/error-boundary';
+import { HeaderActionProvider } from '@/components/layout/header-action-context';
 import { AppRoutes } from './routes';
 
 export function App() {
@@ -12,7 +13,9 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <AppRoutes />
+            <HeaderActionProvider>
+              <AppRoutes />
+            </HeaderActionProvider>
           </AuthProvider>
         </BrowserRouter>
         <Toaster position="top-center" richColors closeButton toastOptions={{ style: { fontSize: 14 } }} />

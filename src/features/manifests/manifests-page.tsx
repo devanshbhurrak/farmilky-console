@@ -1,21 +1,23 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ClipboardList, Plus, SlidersHorizontal } from 'lucide-react';
+import { ClipboardList, Plus } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
 import { StatusBadge } from '@/components/data/status-badge';
 import { FormField } from '@/components/form/form-field';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { cn, formatDate, getErrorMessage, getId, getName, normalizeList, titleCase, todayLocal } from '@/lib/utils';
+import { formatDate, getErrorMessage, getId, getName, normalizeList, titleCase, todayLocal } from '@/lib/utils';
 import type { Manifest } from '@/types/manifest';
 import { manifestsApi } from './api';
 import { useGenerateManifests, useManifests, useMyHistory } from './hooks';
@@ -30,7 +32,6 @@ export default function ManifestsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const date = searchParams.get('date') || todayLocal();
   const slot = searchParams.get('slot') || '';
@@ -39,6 +40,8 @@ export default function ManifestsPage() {
   const page = Math.max(Number(searchParams.get('page') ?? '1') || 1, 1);
 
   const debouncedDate = useDebounce(date, 300);
+
+  const filters = useFilterDrawer({ slot, agentId, status });
 
   const updateParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -114,42 +117,31 @@ export default function ManifestsPage() {
     },
   ];
 
+  const generateAction = useMemo(
+    () =>
+      isAdmin ? (
+        <Button onClick={() => setGenerateOpen(true)} className="min-h-11">
+          <Plus /> Generate
+        </Button>
+      ) : null,
+    [isAdmin, setGenerateOpen],
+  );
+  useRegisterHeaderAction(generateAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={isAdmin ? 'Manifests' : 'My History'}
-        description={isAdmin ? 'Daily delivery manifests by agent' : 'Your past delivery manifests'}
-        actions={
-          isAdmin ? (
-            <Button onClick={() => setGenerateOpen(true)} className="min-h-11">
-              <Plus /> Generate
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title={isAdmin ? 'Manifests' : 'My History'} />
 
       {isAdmin ? (
         <div className="flex flex-col gap-3">
           <div className="flex gap-2">
             <Input type="date" value={date} onChange={(e) => updateParam('date', e.target.value)} aria-label="Date filter" className="flex-1" />
-            <button
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-                filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-                (slot || agentId || status) && 'border-primary-300',
-              )}
-            >
-              <SlidersHorizontal className="size-4" />
-              Filters
-              {(slot || agentId || status) ? (
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                  {[Boolean(slot), Boolean(agentId), Boolean(status)].filter(Boolean).length}
-                </span>
-              ) : null}
-            </button>
+            <FilterButton
+              activeCount={[Boolean(slot), Boolean(agentId), Boolean(status)].filter(Boolean).length}
+              onClick={filters.openDrawer}
+            />
           </div>
-          <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-4', !filtersOpen && 'hidden md:grid')}>
+          <div className="hidden gap-3 md:grid md:grid-cols-3">
             <Select aria-label="Slot filter" value={slot} onChange={(e) => updateParam('slot', e.target.value)}>
               <option value="">All slots</option>
               <option value="morning">Morning</option>
@@ -172,15 +164,70 @@ export default function ManifestsPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Select aria-label="Status filter" value={status} onChange={(e) => updateParam('status', e.target.value)}>
+        <div className="flex flex-col gap-3">
+          <div className="flex md:hidden">
+            <FilterButton activeCount={status ? 1 : 0} onClick={filters.openDrawer} className="flex-1" />
+          </div>
+          <div className="hidden md:block">
+            <Select aria-label="Status filter" value={status} onChange={(e) => updateParam('status', e.target.value)} className="md:max-w-xs">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={[Boolean(slot), Boolean(agentId), Boolean(status)].filter(Boolean).length}
+        onApply={() => {
+          const next = new URLSearchParams(searchParams);
+          const apply = (key: string, value: string) => {
+            if (value) next.set(key, value);
+            else next.delete(key);
+          };
+          apply('slot', filters.draft.slot);
+          apply('agentId', filters.draft.agentId);
+          apply('status', filters.draft.status);
+          next.delete('page');
+          setSearchParams(next, { replace: true });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ slot: '', agentId: '', status: '' })}
+      >
+        {isAdmin ? (
+          <FormField label="Slot">
+            <Select aria-label="Slot filter" value={filters.draft.slot} onChange={(e) => filters.setField('slot', e.target.value)}>
+              <option value="">All slots</option>
+              <option value="morning">Morning</option>
+              <option value="evening">Evening</option>
+            </Select>
+          </FormField>
+        ) : null}
+        {isAdmin ? (
+          <FormField label="Agent">
+            <Select aria-label="Agent filter" value={filters.draft.agentId} onChange={(e) => filters.setField('agentId', e.target.value)}>
+              <option value="">All agents</option>
+              {(agentsQuery.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        ) : null}
+        <FormField label="Status">
+          <Select aria-label="Status filter" value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)}>
             <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="completed">Completed</option>
           </Select>
-        </div>
-      )}
+        </FormField>
+      </FilterDrawer>
 
       <DataTable<Manifest>
         data={items}

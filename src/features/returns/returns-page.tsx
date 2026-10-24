@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,8 @@ export default function ReturnsPage() {
   const search = params.get('search') ?? '';
   const status = params.get('status') ?? '';
   const page = Number(params.get('page') ?? 1) || 1;
+
+  const filters = useFilterDrawer({ status });
 
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
@@ -75,18 +79,44 @@ export default function ReturnsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Returns" description="Review and process return requests" />
+      <PageHeader title="Returns" />
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <SearchInput value={search} onChange={(v) => set({ search: v, page: '' })} placeholder="Search returns…" className="md:max-w-70" />
-        <Select aria-label="Status filter" value={status} onChange={(e) => set({ status: e.target.value, page: '' })} className="md:max-w-55">
-          <option value="">All statuses</option>
-          <option value="requested">Requested</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="completed">Completed</option>
-        </Select>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => set({ search: v, page: '' })} placeholder="Search returns…" className="flex-1 md:max-w-70" />
+          <FilterButton activeCount={status ? 1 : 0} onClick={filters.openDrawer} />
+        </div>
+        <div className="hidden md:block">
+          <Select aria-label="Status filter" value={status} onChange={(e) => set({ status: e.target.value, page: '' })} className="md:max-w-55">
+            <option value="">All statuses</option>
+            <option value="requested">Requested</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="completed">Completed</option>
+          </Select>
+        </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={status ? 1 : 0}
+        onApply={() => {
+          set({ status: filters.draft.status, page: '' });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: '' })}
+      >
+        <FormField label="Status">
+          <Select aria-label="Status filter" value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="requested">Requested</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="completed">Completed</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <DataTable
         data={items}

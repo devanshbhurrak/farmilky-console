@@ -218,9 +218,10 @@ export default function OrderDetailPage() {
                   quantity: it.quantity,
                   price: it.price,
                 })),
-                paymentMethod: (['COD', 'online', 'upi', 'cash'] as const).includes(order.paymentMethod as 'COD')
-                  ? (order.paymentMethod as 'COD' | 'online' | 'upi' | 'cash')
-                  : 'COD',
+                paymentMethod:
+                  order.paymentMethod === 'online' || order.paymentMethod === 'upi'
+                    ? 'online'
+                    : 'COD',
                 deliveryDate: order.deliveryDate?.slice(0, 10) ?? '',
                 notes: order.notes ?? '',
               }}

@@ -10,7 +10,7 @@ export const orderItemSchema = z.object({
 export const createOrderSchema = z.object({
   userId: z.string().min(1, 'Select a customer'),
   items: z.array(orderItemSchema).min(1, 'Add at least one item'),
-  paymentMethod: z.enum(['COD', 'online', 'upi', 'cash']).default('COD'),
+  paymentMethod: z.enum(['COD', 'online']).default('COD'),
   deliveryDate: z.string().optional(),
   notes: z.string().optional(),
   address: z

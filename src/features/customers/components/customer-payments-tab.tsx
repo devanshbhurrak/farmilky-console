@@ -1,8 +1,8 @@
-import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,9 @@ import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { FormField } from '@/components/form/form-field';
-import { formatCurrency, formatDate, getErrorMessage, getId, todayLocal } from '@/lib/utils';
-import { useCustomerPassbook, useRecordAdjustment, useRecordPayment } from '../hooks';
-import type { LedgerEntry } from '@/types/customer';
+import { cn, formatCurrency, formatDate, getErrorMessage, getId, titleCase, todayLocal } from '@/lib/utils';
+import { useCustomerLedger, useRecordAdjustment, useRecordPayment } from '../hooks';
+import type { LedgerEntry, LedgerSummary } from '@/types/customer';
 
 const collectSchema = z.object({
   amount: z.coerce.number().min(1, 'Amount must be at least ₹1'),
@@ -182,6 +182,121 @@ export function CollectAdjustDialogs({
   );
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  bank_transfer: 'Bank transfer',
+  card: 'Card',
+  online: 'Online',
+  cod: 'COD',
+};
+
+function paymentMethodLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return PAYMENT_METHOD_LABELS[value.toLowerCase()] ?? titleCase(value);
+}
+
+function LedgerSummaryBar({ summary }: { summary: LedgerSummary }) {
+  const netTone =
+    summary.net > 0 ? 'text-rose-700' : summary.net < 0 ? 'text-emerald-700' : 'text-slate-900';
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+        <p className="text-xs font-semibold text-slate-700">Month summary</p>
+        <p className="text-[11px] text-slate-400">
+          {summary.count} {summary.count === 1 ? 'entry' : 'entries'}
+        </p>
+      </div>
+      <dl className="grid grid-cols-3 divide-x divide-slate-100">
+        <div className="min-w-0 px-3 py-2.5">
+          <dt className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+            Charges
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-semibold tabular-nums text-amber-700">
+            {formatCurrency(summary.debit)}
+          </dd>
+        </div>
+        <div className="min-w-0 px-3 py-2.5">
+          <dt className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+            Payments
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-semibold tabular-nums text-emerald-700">
+            {formatCurrency(summary.credit)}
+          </dd>
+        </div>
+        <div className="min-w-0 px-3 py-2.5">
+          <dt className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <span
+              className={cn(
+                'size-1.5 rounded-full',
+                summary.net > 0 ? 'bg-rose-500' : summary.net < 0 ? 'bg-emerald-500' : 'bg-slate-300',
+              )}
+              aria-hidden
+            />
+            Net
+          </dt>
+          <dd className={cn('mt-0.5 truncate text-sm font-semibold tabular-nums', netTone)}>
+            {formatCurrency(summary.net)}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function LedgerCard({ entry }: { entry: LedgerEntry }) {
+  const isDebit = entry.type === 'debit';
+  const method = paymentMethodLabel(entry.paymentType);
+  const meta = [formatDate(entry.date), entry.category ? titleCase(entry.category) : null, method].filter(
+    Boolean,
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-2.5">
+          <span
+            className={cn(
+              'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full',
+              isDebit ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+            )}
+            aria-hidden
+          >
+            {isDebit ? <ArrowUpRight className="size-3.5" /> : <ArrowDownLeft className="size-3.5" />}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">{entry.description}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-500">{meta.join(' · ')}</p>
+            {entry.transactionId ? (
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">Ref: {entry.transactionId}</p>
+            ) : null}
+            {entry.notes && entry.notes !== entry.description ? (
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">{entry.notes}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p
+            className={cn(
+              'text-sm font-bold tabular-nums whitespace-nowrap',
+              isDebit ? 'text-amber-700' : 'text-emerald-700',
+            )}
+          >
+            {isDebit ? '+' : '−'}
+            {formatCurrency(entry.amount)}
+          </p>
+          <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+            {isDebit ? 'Charge' : 'Payment'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CustomerPaymentsTab({
   userId,
   month,
@@ -191,27 +306,38 @@ export function CustomerPaymentsTab({
   month?: number;
   year?: number;
 }) {
-  const [collectOpen, setCollectOpen] = React.useState(false);
-  const [adjustOpen, setAdjustOpen] = React.useState(false);
-  const passbookParams = month !== undefined || year !== undefined ? { month, year } : undefined;
-  const { data, isLoading, error, refetch } = useCustomerPassbook(userId, passbookParams);
+  const now = new Date();
+  const selectedMonth = month ?? now.getMonth() + 1;
+  const selectedYear = year ?? now.getFullYear();
+  const { data, isLoading, error, refetch } = useCustomerLedger(userId, {
+    month: selectedMonth,
+    year: selectedYear,
+  });
 
   const columns: Column<LedgerEntry>[] = [
     {
       header: 'Date',
+      className: 'whitespace-nowrap',
       cell: (e) => <span className="whitespace-nowrap">{formatDate(e.date)}</span>,
     },
     {
       header: 'Description',
-      cell: (e) => (
-        <div>
-          <p className="font-medium text-slate-800">{e.description}</p>
-          {e.transactionId ? <p className="text-xs text-slate-500">Ref: {e.transactionId}</p> : null}
-        </div>
-      ),
+      cell: (e) => {
+        const meta = [e.category ? titleCase(e.category) : null, paymentMethodLabel(e.paymentType)]
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          <div>
+            <p className="font-medium text-slate-800">{e.description}</p>
+            {meta ? <p className="text-xs text-slate-500">{meta}</p> : null}
+            {e.transactionId ? <p className="text-xs text-slate-400">Ref: {e.transactionId}</p> : null}
+          </div>
+        );
+      },
     },
     {
       header: 'Debit',
+      className: 'whitespace-nowrap',
       cell: (e) =>
         e.type === 'debit' ? (
           <span className="font-medium whitespace-nowrap text-amber-700">{formatCurrency(e.amount)}</span>
@@ -221,6 +347,7 @@ export function CustomerPaymentsTab({
     },
     {
       header: 'Credit',
+      className: 'whitespace-nowrap',
       cell: (e) =>
         e.type !== 'debit' ? (
           <span className="font-medium whitespace-nowrap text-emerald-700">{formatCurrency(e.amount)}</span>
@@ -231,17 +358,12 @@ export function CustomerPaymentsTab({
   ];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => setCollectOpen(true)} className="min-h-11">
-          Collect payment
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)} className="min-h-11">
-          Adjust balance
-        </Button>
-      </div>
+    <div>
+      {!isLoading && !error && data && data.entries.length > 0 ? (
+        <LedgerSummaryBar summary={data.summary} />
+      ) : null}
       <DataTable<LedgerEntry>
-        data={data ?? []}
+        data={data?.entries ?? []}
         columns={columns}
         keyExtractor={(e, i) => getId(e) || `entry-${i}`}
         loading={isLoading}
@@ -249,13 +371,7 @@ export function CustomerPaymentsTab({
         onRetry={() => refetch()}
         emptyTitle="No ledger entries"
         emptyMessage="Payments and charges for this month will appear here."
-      />
-      <CollectAdjustDialogs
-        userId={userId}
-        collectOpen={collectOpen}
-        onCollectChange={setCollectOpen}
-        adjustOpen={adjustOpen}
-        onAdjustChange={setAdjustOpen}
+        renderCard={(entry) => <LedgerCard entry={entry} />}
       />
     </div>
   );

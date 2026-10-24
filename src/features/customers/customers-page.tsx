@@ -1,12 +1,15 @@
 import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, SlidersHorizontal, Users } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { FilterBar } from '@/components/data/filter-bar';
 import type { ActiveFilter } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -15,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { queryKeys } from '@/lib/query-keys';
-import { cn, formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
+import { formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useCreateCustomer, useCustomers } from './hooks';
 import { customersApi } from './api';
@@ -34,7 +37,6 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const search = params.get('search') ?? '';
   const status = params.get('status') ?? 'all';
@@ -42,6 +44,8 @@ export default function CustomersPage() {
   const sort = params.get('sort') ?? 'newest';
   const page = Number(params.get('page') ?? 1) || 1;
   const debouncedSearch = useDebounce(search, 400);
+
+  const filters = useFilterDrawer({ status, balance: balanceFilter, sort });
 
   function update(next: Record<string, string>) {
     const sp = new URLSearchParams(params);
@@ -58,6 +62,16 @@ export default function CustomersPage() {
     search: debouncedSearch || undefined,
   });
   const createMutation = useCreateCustomer();
+
+  const createAction = React.useMemo(
+    () => (
+      <Button onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm">
+        <Plus aria-hidden /> Customer
+      </Button>
+    ),
+    [setCreateOpen]
+  );
+  useRegisterHeaderAction(createAction);
 
   const { data: areasRes } = useQuery({
     queryKey: queryKeys.areas.list(),
@@ -148,37 +162,14 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Customers"
-        description="Manage customer accounts, balances and deliveries"
-        actions={
-          <Button onClick={() => setCreateOpen(true)} className="min-h-11">
-            <Plus aria-hidden /> New customer
-          </Button>
-        }
-      />
+      <PageHeader title="Customers" />
 
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
           <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search name, phone, email…" className="flex-1" />
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-              (status !== 'all' || balanceFilter !== 'all') && 'border-primary-300',
-            )}
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {(status !== 'all' || balanceFilter !== 'all') ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                {[status !== 'all', balanceFilter !== 'all'].filter(Boolean).length}
-              </span>
-            ) : null}
-          </button>
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
         </div>
-        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-3 md:grid">
           <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -197,6 +188,40 @@ export default function CustomersPage() {
           </Select>
         </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          update({ status: filters.draft.status, balance: filters.draft.balance, sort: filters.draft.sort, page: '1' });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: 'all', balance: 'all', sort: 'newest' })}
+      >
+        <FormField label="Status">
+          <Select value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)} aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </FormField>
+        <FormField label="Balance">
+          <Select value={filters.draft.balance} onChange={(e) => filters.setField('balance', e.target.value)} aria-label="Balance filter">
+            <option value="all">Any balance</option>
+            <option value="due">Due</option>
+            <option value="clear">Clear</option>
+          </Select>
+        </FormField>
+        <FormField label="Sort by">
+          <Select value={filters.draft.sort} onChange={(e) => filters.setField('sort', e.target.value)} aria-label="Sort customers">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">Name A–Z</option>
+            <option value="highest-due">Highest due</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <FilterBar
         filters={activeFilters}
@@ -217,7 +242,7 @@ export default function CustomersPage() {
         emptyActionLabel="New customer"
         onEmptyAction={() => setCreateOpen(true)}
         renderCard={(c) => (
-          <CustomerCard customer={c} onCollect={() => navigate(`/customers/${getId(c)}`)} onEdit={() => navigate(`/customers/${getId(c)}`)} />
+          <CustomerCard customer={c} onOpen={() => navigate(`/customers/${getId(c)}`)} />
         )}
         page={page}
         totalPages={data?.meta.totalPages ?? 0}

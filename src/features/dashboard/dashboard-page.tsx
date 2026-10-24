@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/layout/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { todayLocal, unwrapData } from '@/lib/utils';
+import { AlertTriangle } from 'lucide-react';
 import {
   useAdminStats,
   useBoardSummary,
@@ -67,20 +68,25 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Dashboard" description="Overview of sales, operations and work queues" />
+      <PageHeader title="Dashboard" />
 
       {failures.length > 0 && (
         <div
           role="alert"
           className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
-          <span className="font-semibold">Some dashboard sections failed to load:</span>{' '}
-          {failures.join(', ')}. Showing available data — retry in a bit.
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <span>
+              <span className="font-semibold">Some dashboard sections failed to load:</span>
+              {' '}{failures.join(', ')}. Showing available data — retry in a bit.
+            </span>
+          </div>
         </div>
       )}
 
       {statsQuery.isLoading ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-[76px] w-full rounded-xl" />
           ))}

@@ -12,11 +12,10 @@ export interface ComplaintListParams {
 
 export interface CreateComplaintInput {
   subject: string;
-  description?: string;
-  category?: string;
-  relatedTo?: string;
-  relatedId?: string;
-  userId?: string;
+  description: string;
+  relatedTo: string;
+  referenceType?: string;
+  referenceId?: string;
 }
 
 export const complaintsApi = {
@@ -32,7 +31,13 @@ export const complaintsApi = {
     return { items, meta };
   },
   create: async (data: CreateComplaintInput): Promise<Complaint> => {
-    const res = await api.post<unknown>('/api/complaints', data);
+    const res = await api.post<unknown>('/api/complaints', {
+      subject: data.subject,
+      description: data.description,
+      relatedTo: data.relatedTo,
+      referenceType: data.referenceType || undefined,
+      referenceId: data.referenceId || undefined,
+    });
     return unwrapData<Complaint>(res as { success?: boolean; data?: Complaint });
   },
   updateStatus: async (id: string, data: { status: string; resolution?: string }): Promise<Complaint> => {

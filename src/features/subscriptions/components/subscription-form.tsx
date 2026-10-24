@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { FormField } from '@/components/form/form-field';
-import { SearchInput } from '@/components/data/search-input';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useDebounce } from '@/hooks/use-debounce';
 import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, getId, getName, normalizeList } from '@/lib/utils';
@@ -166,24 +166,19 @@ export function SubscriptionForm({
     >
       {!fixedCustomerId && (
         <FormField label="Customer" required error={errors.userId?.message}>
-          <SearchInput
-            value={customerSearch}
-            onChange={setCustomerSearch}
-            placeholder="Search customers by name or phone…"
-          />
-          <Select
-            aria-label="Customer"
+          <SearchableSelect
+            options={customers.map((c) => {
+              const name = getName(c);
+              return {
+                id: getId(c),
+                label: c.phone ? `${name} · ${c.phone}` : name,
+              };
+            })}
             value={watch('userId')}
-            onChange={(e) => setValue('userId', e.target.value, { shouldValidate: true })}
-            className="mt-2"
-          >
-            <option value="">Select customer</option>
-            {customers.map((c) => (
-              <option key={getId(c)} value={getId(c)}>
-                {getName(c)} {c.phone ? `· ${c.phone}` : ''}
-              </option>
-            ))}
-          </Select>
+            onChange={(id) => setValue('userId', id, { shouldValidate: true })}
+            placeholder="Search customer by name or phone…"
+            onSearch={setCustomerSearch}
+          />
         </FormField>
       )}
 

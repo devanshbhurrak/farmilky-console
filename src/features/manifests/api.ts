@@ -7,6 +7,35 @@ export interface GenerateManifestRequest {
   slot?: string;
 }
 
+export function toManifest(raw: unknown): Manifest {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const agent = (o.agent ?? null) as { id?: string; name?: string } | null;
+  const area = (o.area ?? null) as { id?: string; name?: string } | null;
+  const entries = Array.isArray(o.entries) ? (o.entries as Manifest['entries']) : [];
+  const delivered = (entries ?? []).filter((e) => e.status === 'delivered').length;
+  const failed = (entries ?? []).filter((e) => e.status === 'failed').length;
+  const pending = (entries ?? []).filter((e) => e.status === 'pending').length;
+  return {
+    id: String(o.id ?? ''),
+    agentId: agent?.id ?? (o.agentId as Manifest['agentId']) ?? '',
+    agentName: agent?.name ?? (o.agentName as string | undefined),
+    areaId: area ? { id: area.id ?? '', name: area.name ?? '' } : (o.areaId as Manifest['areaId']),
+    areaName: area?.name ?? (o.areaName as string | undefined),
+    date: String(o.manifestDate ?? o.date ?? ''),
+    slot: (o.deliverySlot as string | undefined) ?? (o.slot as string | undefined),
+    status: String(o.status ?? 'active'),
+    entries,
+    summary:
+      (o.summary as Manifest['summary']) ?? {
+        total: entries?.length ?? 0,
+        delivered,
+        failed,
+        pending,
+      },
+    createdAt: String(o.createdAt ?? new Date().toISOString()),
+  };
+}
+
 export interface ManifestEntryUpdate {
   status: string;
   notes?: string;

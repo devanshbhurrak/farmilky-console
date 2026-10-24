@@ -5,6 +5,11 @@ import type { ProductInput } from './schemas';
 
 type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
+export interface UploadImageResponse {
+  url: string;
+  key: string;
+}
+
 export const productsApi = {
   list: (params?: ProductListParams) =>
     api.get<PaginatedResponse<Product> | ApiResponse<Product[]>>(
@@ -16,4 +21,6 @@ export const productsApi = {
   update: (id: string, data: ProductInput) =>
     api.put<ApiResponse<Product>>(`/api/products/${id}`, data),
   remove: (id: string) => api.delete<ApiResponse<unknown>>(`/api/products/${id}`),
+  uploadImage: (formData: FormData) =>
+    api.post<UploadImageResponse>('/api/upload/image', formData),
 };

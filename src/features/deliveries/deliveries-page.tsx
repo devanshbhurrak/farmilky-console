@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, ClipboardList, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/data/empty-state';
@@ -10,7 +10,7 @@ import { ErrorState } from '@/components/data/error-state';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useDebounce } from '@/hooks/use-debounce';
 import { queryKeys } from '@/lib/query-keys';
-import { getErrorMessage, getId, getName, normalizeList, todayLocal } from '@/lib/utils';
+import { cn, getErrorMessage, getId, getName, normalizeList, todayLocal } from '@/lib/utils';
 import type { DeliveryBoardEntry } from '@/types/delivery';
 import { deliveriesApi } from './api';
 import { useDeliveryBoard, useDeliveryBoardSSE } from './hooks';
@@ -180,13 +180,25 @@ export default function DeliveriesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Delivery board" description={`${date} · ${slot} slot`} />
+      <PageHeader title="Delivery board" />
 
-      {(summary) && (
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">Total {summary.total}</Badge>
-          <Badge variant="warning">Remaining {summary.remainingDeliveries}</Badge>
-          <Badge variant="success">Delivered {summary.delivered}</Badge>
+      {summary && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Total', value: summary.total, icon: ClipboardList, colorClass: 'bg-slate-100 text-slate-600' },
+            { label: 'Remaining', value: summary.remainingDeliveries, icon: Clock, colorClass: 'bg-amber-100 text-amber-700' },
+            { label: 'Delivered', value: summary.delivered, icon: CheckCircle2, colorClass: 'bg-emerald-100 text-emerald-700' },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-card">
+              <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg', s.colorClass)}>
+                <s.icon className="size-3.5" aria-hidden />
+              </span>
+              <div>
+                <p className="text-[11px] text-slate-500">{s.label}</p>
+                <p className="text-sm font-semibold tabular-nums text-slate-900">{s.value}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

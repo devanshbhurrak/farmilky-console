@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal, Wallet } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable, type Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -23,7 +25,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField } from '@/components/form/form-field';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
-  cn,
   formatCurrency,
   formatDate,
   getErrorMessage,
@@ -188,7 +189,7 @@ export default function PaymentsPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filters = useFilterDrawer({ balance: balanceFilter as string });
   const [collectCustomer, setCollectCustomer] = useState<Customer | null>(null);
   const [adjustCustomer, setAdjustCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
@@ -322,19 +323,20 @@ export default function PaymentsPage() {
     },
   ];
 
+  const headerAction = useMemo(
+    () =>
+      tab === 'supplier' ? (
+        <Button onClick={() => setRecordSupplierOpen(true)} className="min-h-11">
+          Record supplier payment
+        </Button>
+      ) : null,
+    [tab, setRecordSupplierOpen],
+  );
+  useRegisterHeaderAction(headerAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Payments"
-        description="Collect customer payments and pay suppliers"
-        actions={
-          tab === 'supplier' ? (
-            <Button onClick={() => setRecordSupplierOpen(true)} className="min-h-11">
-              Record supplier payment
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Payments" />
 
       <Tabs value={tab} onValueChange={(v) => setParam('tab', v === 'supplier' ? 'supplier' : 'customer')}>
         <TabsList>
@@ -358,24 +360,9 @@ export default function PaymentsPage() {
                   placeholder="Search customers…"
                   className="flex-1"
                 />
-                <button
-                  onClick={() => setFiltersOpen(!filtersOpen)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-                    filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-                    balanceFilter !== 'all' && 'border-primary-300',
-                  )}
-                >
-                  <SlidersHorizontal className="size-4" />
-                  Filters
-                  {balanceFilter !== 'all' ? (
-                    <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                      1
-                    </span>
-                  ) : null}
-                </button>
+                <FilterButton activeCount={balanceFilter !== 'all' ? 1 : 0} onClick={filters.openDrawer} />
               </div>
-              <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', !filtersOpen && 'hidden md:grid')}>
+              <div className="hidden grid-cols-1 gap-3 sm:grid-cols-2 md:grid">
                 <Select
                   value={balanceFilter}
                   onChange={(e) => setParam('balance', e.target.value)}
@@ -389,6 +376,31 @@ export default function PaymentsPage() {
                 </Select>
               </div>
             </div>
+
+            <FilterDrawer
+              open={filters.open}
+              onOpenChange={filters.setOpen}
+              activeCount={balanceFilter !== 'all' ? 1 : 0}
+              onApply={() => {
+                setParam('balance', filters.draft.balance);
+                filters.setOpen(false);
+              }}
+              onReset={() => filters.setDraft({ balance: 'all' })}
+            >
+              <FormField label="Balance">
+                <Select
+                  value={filters.draft.balance}
+                  onChange={(e) => filters.setField('balance', e.target.value)}
+                  className="min-h-11"
+                  aria-label="Balance filter"
+                >
+                  <option value="all">All balances</option>
+                  <option value="due">Due</option>
+                  <option value="advance">Advance</option>
+                  <option value="zero">Settled</option>
+                </Select>
+              </FormField>
+            </FilterDrawer>
 
             <DataTable<Customer>
               data={filteredCustomers}

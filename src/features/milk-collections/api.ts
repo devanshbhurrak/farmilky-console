@@ -6,7 +6,7 @@ export interface CollectionHistoryParams {
   supplierId?: string;
   from?: string;
   to?: string;
-  session?: string;
+  status?: string;
   page?: number;
   limit?: number;
 }
@@ -20,6 +20,7 @@ export interface ConfirmCollectionInput {
 }
 
 export interface UpdateCollectionInput {
+  void_reason?: string;
   actualQty?: number;
   ratePerLiter?: number;
   fatContent?: number | null;
@@ -59,15 +60,18 @@ export const milkApi = {
     return unwrapData<MilkCollection>(res as { success?: boolean; data?: MilkCollection });
   },
   update: async (id: string, data: UpdateCollectionInput): Promise<MilkCollection> => {
-    const res = await api.put<unknown>(`/api/milk-collections/${id}`, data);
+    const res = await api.put<unknown>(`/api/milk-collections/${id}`, {
+      ...data,
+      void_reason: data.void_reason || 'Admin edit',
+    });
     return unwrapData<MilkCollection>(res as { success?: boolean; data?: MilkCollection });
   },
   history: async (params: CollectionHistoryParams): Promise<{ items: MilkCollection[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
     const res = await api.get<unknown>('/api/milk-collections', {
       supplierId: params.supplierId,
-      from: params.from,
-      to: params.to,
-      session: params.session,
+      startDate: params.from || undefined,
+      endDate: params.to || undefined,
+      status: params.status || undefined,
       page: params.page,
       limit: params.limit,
     });

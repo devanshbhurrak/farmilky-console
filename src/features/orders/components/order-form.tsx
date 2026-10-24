@@ -231,8 +231,6 @@ export function OrderForm({
             <Select {...register('paymentMethod')}>
               <option value="COD">COD</option>
               <option value="online">Online</option>
-              <option value="upi">UPI</option>
-              <option value="cash">Cash</option>
             </Select>
           </FormField>
           <FormField label="Delivery date" error={errors.deliveryDate?.message}>

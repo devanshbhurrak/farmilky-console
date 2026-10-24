@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage, normalizeList, unwrapData } from '@/lib/utils';
 import type { Manifest, ManifestListParams } from '@/types/manifest';
-import { manifestsApi } from './api';
+import { manifestsApi, toManifest } from './api';
 import type { GenerateManifestRequest, ManifestEntryUpdate } from './api';
 
 export function useManifests(params: ManifestListParams) {
@@ -11,8 +11,27 @@ export function useManifests(params: ManifestListParams) {
     queryKey: queryKeys.manifests.list({ ...params }),
     queryFn: async () => {
       const res = await manifestsApi.list(params);
-      const { items, meta } = normalizeList<Manifest>(res);
-      return { items, meta };
+      const { items } = normalizeList<unknown>(res);
+      let mapped = items.map(toManifest);
+      if (params.agentId) {
+        mapped = mapped.filter((m) => {
+          const id = typeof m.agentId === 'string' ? m.agentId : m.agentId?.id;
+          return id === params.agentId;
+        });
+      }
+      if (params.status) mapped = mapped.filter((m) => m.status === params.status);
+      const page = params.page ?? 1;
+      const limit = params.limit ?? 20;
+      const start = (page - 1) * limit;
+      return {
+        items: mapped.slice(start, start + limit),
+        meta: {
+          total: mapped.length,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(mapped.length / limit)),
+        },
+      };
     },
     placeholderData: keepPreviousData,
   });
@@ -23,7 +42,8 @@ export function useManifest(id: string | undefined) {
     queryKey: queryKeys.manifests.detail(id ?? ''),
     queryFn: async (): Promise<Manifest> => {
       const res = await manifestsApi.get(id as string);
-      return unwrapData<Manifest>(res);
+      const data = unwrapData<Record<string, unknown>>(res as unknown as Record<string, unknown>);
+      return toManifest(data.manifest ?? data);
     },
     enabled: Boolean(id),
     placeholderData: keepPreviousData,
@@ -96,8 +116,8 @@ export function useMyHistory(params: { page?: number; limit?: number }) {
     queryKey: queryKeys.manifests.history({ ...params }),
     queryFn: async () => {
       const res = await manifestsApi.myHistory(params);
-      const { items, meta } = normalizeList<Manifest>(res);
-      return { items, meta };
+      const { items, meta } = normalizeList<unknown>(res);
+      return { items: items.map(toManifest), meta };
     },
     placeholderData: keepPreviousData,
   });

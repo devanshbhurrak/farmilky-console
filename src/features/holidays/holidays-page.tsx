@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/components/data/data-table';
 import { StatusBadge } from '@/components/data/status-badge';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { formatDate, getId } from '@/lib/utils';
@@ -73,20 +74,21 @@ export default function HolidaysPage() {
     });
   }
 
+  const createAction = React.useMemo(
+    () =>
+      isAdmin ? (
+        <Button onClick={() => setSheetOpen(true)} className="px-3 py-1.5 text-sm">
+          <Plus aria-hidden />
+          Holiday
+        </Button>
+      ) : null,
+    [isAdmin, setSheetOpen],
+  );
+  useRegisterHeaderAction(createAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Holidays"
-        description="Delivery holidays — no deliveries are scheduled on active holidays"
-        actions={
-          isAdmin ? (
-            <Button onClick={() => setSheetOpen(true)}>
-              <Plus />
-              Add holiday
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Holidays" />
 
       <div className="flex items-center gap-2">
         <Select

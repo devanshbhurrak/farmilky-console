@@ -1,8 +1,11 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +34,8 @@ export default function ComplaintsPage() {
   const category = params.get('category') ?? '';
   const page = Number(params.get('page') ?? 1) || 1;
 
+  const filters = useFilterDrawer({ status, category });
+
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) {
@@ -48,10 +53,20 @@ export default function ComplaintsPage() {
     status: status || undefined,
     category: category || undefined,
   });
+  const [createOpen, setCreateOpen] = React.useState(false);
   const createMutation = useCreateComplaint();
+
+  const createAction = React.useMemo(
+    () => (
+      <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
+        New complaint
+      </Button>
+    ),
+    [setCreateOpen]
+  );
+  useRegisterHeaderAction(createAction);
   const statusMutation = useUpdateComplaintStatus();
 
-  const [createOpen, setCreateOpen] = React.useState(false);
   const [resolving, setResolving] = React.useState<Complaint | null>(null);
   const [resolution, setResolution] = React.useState('');
   const [advancingId, setAdvancingId] = React.useState('');
@@ -111,20 +126,18 @@ export default function ComplaintsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Complaints"
-        description="Track and resolve customer complaints"
-        actions={
-          <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
-            New complaint
-          </Button>
-        }
-      />
+      <PageHeader title="Complaints" />
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <SearchInput value={search} onChange={(v) => set({ search: v, page: '' })} placeholder="Search complaints…" className="md:max-w-70" />
-        <div className="grid grid-cols-2 gap-3 md:flex">
-          <Select aria-label="Status filter" value={status} onChange={(e) => set({ status: e.target.value, page: '' })}>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => set({ search: v, page: '' })} placeholder="Search complaints…" className="flex-1 md:max-w-70" />
+          <FilterButton
+            activeCount={[Boolean(status), Boolean(category)].filter(Boolean).length}
+            onClick={filters.openDrawer}
+          />
+        </div>
+        <div className="hidden gap-3 md:flex md:items-center">
+          <Select aria-label="Status filter" value={status} onChange={(e) => set({ status: e.target.value, page: '' })} className="md:w-48">
             <option value="">All statuses</option>
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
@@ -134,6 +147,30 @@ export default function ComplaintsPage() {
           <Input aria-label="Category filter" placeholder="Category" value={category} onChange={(e) => set({ category: e.target.value, page: '' })} className="md:w-40" />
         </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={[Boolean(status), Boolean(category)].filter(Boolean).length}
+        onApply={() => {
+          set({ status: filters.draft.status, category: filters.draft.category, page: '' });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: '', category: '' })}
+      >
+        <FormField label="Status">
+          <Select aria-label="Status filter" value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </Select>
+        </FormField>
+        <FormField label="Category">
+          <Input aria-label="Category filter" placeholder="Category" value={filters.draft.category} onChange={(e) => filters.setField('category', e.target.value)} />
+        </FormField>
+      </FilterDrawer>
 
       <DataTable
         data={items}
@@ -189,11 +226,10 @@ export default function ComplaintsPage() {
                 createMutation.mutate(
                   {
                     subject: values.subject,
-                    description: values.description || undefined,
-                    category: values.category || undefined,
-                    relatedTo: values.relatedTo || undefined,
-                    relatedId: values.relatedId || undefined,
-                    userId: values.userId || undefined,
+                    description: values.description,
+                    relatedTo: values.relatedTo,
+                    referenceType: values.referenceType || undefined,
+                    referenceId: values.referenceId || undefined,
                   },
                   { onSuccess: () => setCreateOpen(false) },
                 )

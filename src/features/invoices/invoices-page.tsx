@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Receipt, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Receipt } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable, type Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useDebounce } from '@/hooks/use-debounce';
-import { cn, formatCurrency, getErrorMessage, getId } from '@/lib/utils';
+import { formatCurrency, getErrorMessage, getId } from '@/lib/utils';
 import { INVOICE_STATUSES, type Invoice } from '@/types/invoice';
 import { useInvoices } from './hooks';
 import { InvoiceCard, customerLabel, periodLabel } from './components/invoice-table';
@@ -34,7 +37,8 @@ export default function InvoicesPage() {
 
   const [generateOpen, setGenerateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const filters = useFilterDrawer({ status });
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -100,22 +104,24 @@ export default function InvoicesPage() {
     },
   ];
 
+  const headerAction = useMemo(
+    () => (
+      <>
+        <Button variant="outline" onClick={() => setBulkOpen(true)} className="min-h-11">
+          Bulk generate
+        </Button>
+        <Button onClick={() => setGenerateOpen(true)} className="min-h-11">
+          Generate invoice
+        </Button>
+      </>
+    ),
+    [setBulkOpen, setGenerateOpen],
+  );
+  useRegisterHeaderAction(headerAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Invoices"
-        description="Generate and track customer invoices"
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setBulkOpen(true)} className="min-h-11">
-              Bulk generate
-            </Button>
-            <Button onClick={() => setGenerateOpen(true)} className="min-h-11">
-              Generate invoice
-            </Button>
-          </>
-        }
-      />
+      <PageHeader title="Invoices" />
 
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
@@ -125,24 +131,9 @@ export default function InvoicesPage() {
             placeholder="Search invoices…"
             className="flex-1"
           />
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-              Boolean(status) && 'border-primary-300',
-            )}
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {Boolean(status) ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                1
-              </span>
-            ) : null}
-          </button>
+          <FilterButton activeCount={status ? 1 : 0} onClick={filters.openDrawer} />
         </div>
-        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-2 md:grid">
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
               <ChevronLeft />
@@ -175,6 +166,32 @@ export default function InvoicesPage() {
           </Select>
         </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={status ? 1 : 0}
+        onApply={() => {
+          setParam('status', filters.draft.status);
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: '' })}
+      >
+        <FormField label="Status">
+          <Select
+            value={filters.draft.status}
+            onChange={(e) => filters.setField('status', e.target.value)}
+            aria-label="Status filter"
+          >
+            <option value="">All statuses</option>
+            {INVOICE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <DataTable<Invoice>
         data={invoices}

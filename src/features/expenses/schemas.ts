@@ -5,7 +5,7 @@ export const expenseSchema = z.object({
   amount: z.coerce.number().positive('Amount must be greater than 0'),
   category: z.enum(EXPENSE_CATEGORIES),
   date: z.string().min(1, 'Date is required'),
-  description: z.string().trim().optional().default(''),
+  description: z.string().trim().min(1, 'Description is required'),
   paymentMethod: z.enum(EXPENSE_PAYMENT_METHODS).default('cash'),
   receiptReference: z.string().trim().optional().default(''),
 });

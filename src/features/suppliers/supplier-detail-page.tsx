@@ -38,7 +38,7 @@ const adjustmentSchema = z.object({
   category: z.enum(['advance', 'transport', 'quality_bonus', 'quality_penalty', 'rounding', 'other']),
   amount: z.coerce.number().min(1, 'Amount must be at least ₹1'),
   date: z.string().optional(),
-  description: z.string().optional(),
+  description: z.string().trim().min(1, 'Description is required'),
 });
 
 type PaymentValues = z.infer<typeof paymentSchema>;

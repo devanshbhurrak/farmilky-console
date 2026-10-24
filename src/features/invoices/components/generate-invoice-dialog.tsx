@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/form/form-field';
 import { useDebounce } from '@/hooks/use-debounce';
-import { getErrorMessage, getId, getName, normalizeList, todayLocal } from '@/lib/utils';
+import { getErrorMessage, getId, getName, normalizeList } from '@/lib/utils';
 import { invoicesApi } from '../api';
 import { generateSchema, type GenerateInvoiceInput } from '../schemas';
 import { useGenerateInvoice } from '../hooks';
@@ -34,7 +34,10 @@ export function GenerateInvoiceDialog({
     formState: { errors, isSubmitting },
   } = useForm<GenerateInvoiceInput>({
     resolver: zodResolver(generateSchema),
-    defaultValues: { userId: '', from: todayLocal(), to: todayLocal() },
+    defaultValues: {
+      userId: '',
+      period: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+    },
   });
 
   const selectedUserId = watch('userId');
@@ -51,8 +54,9 @@ export function GenerateInvoiceDialog({
   const generateInvoice = useGenerateInvoice();
 
   const onSubmit = (values: GenerateInvoiceInput) => {
+    const [year, month] = values.period.split('-').map(Number);
     generateInvoice.mutate(
-      { userId: values.userId, input: { from: values.from, to: values.to } },
+      { userId: values.userId, input: { month, year } },
       {
         onSuccess: (res) => {
           const data = (res as { data?: { id?: string; _id?: string } }).data;
@@ -94,14 +98,9 @@ export function GenerateInvoiceDialog({
               ))}
             </Select>
           </FormField>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="From" required error={errors.from?.message}>
-              <Input type="date" {...register('from')} className="min-h-11" />
-            </FormField>
-            <FormField label="To" required error={errors.to?.message}>
-              <Input type="date" {...register('to')} className="min-h-11" />
-            </FormField>
-          </div>
+          <FormField label="Billing month" required error={errors.period?.message}>
+            <Input type="month" {...register('period')} className="min-h-11" />
+          </FormField>
         </form>
       </DialogBody>
       <DialogFooter>

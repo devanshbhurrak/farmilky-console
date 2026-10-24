@@ -41,7 +41,7 @@ function Bars({ rows }: { rows: PerformanceRow[] }) {
                 {formatNumber(r.delivered ?? 0, 0)}/{formatNumber(r.total ?? 0, 0)} · {clamped}%
               </span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-blue-500" style={{ width: `${clamped}%` }} />
             </div>
           </div>

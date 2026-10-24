@@ -3,8 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
@@ -105,8 +108,10 @@ export default function MilkCollectionsPage() {
   const hSupplier = params.get('hSupplier') ?? '';
   const hFrom = params.get('hFrom') ?? '';
   const hTo = params.get('hTo') ?? '';
-  const hSession = params.get('hSession') ?? '';
+  const hStatus = params.get('hStatus') ?? '';
   const page = Number(params.get('page') ?? 1) || 1;
+
+  const filters = useFilterDrawer({ hSupplier, hFrom, hTo, hStatus });
 
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
@@ -144,7 +149,7 @@ export default function MilkCollectionsPage() {
     supplierId: hSupplier || undefined,
     from: hFrom || undefined,
     to: hTo || undefined,
-    session: hSession || undefined,
+    status: hStatus || undefined,
     page,
     limit: 20,
   });
@@ -193,7 +198,7 @@ export default function MilkCollectionsPage() {
   const historyLiters = historyItems.reduce((s, c) => s + (Number(c.actualQty ?? 0) || 0), 0);
   const historyAmount = historyItems.reduce((s, c) => s + (Number(c.amount ?? 0) || 0), 0);
 
-  const exportHistoryCsv = () => {
+  const exportHistoryCsv = React.useCallback(() => {
     try {
       downloadCsv(
         `milk-collections-${hFrom || 'all'}-${hTo || 'all'}.csv`,
@@ -214,29 +219,26 @@ export default function MilkCollectionsPage() {
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
-  };
+  }, [hFrom, hTo, historyItems]);
+
+  const headerAction = React.useMemo(
+    () =>
+      tab === 'daily' ? (
+        <Button className="min-h-11" loading={generate.isPending} onClick={() => generate.mutate(date)}>
+          Generate day
+        </Button>
+      ) : (
+        <Button variant="outline" className="min-h-11" onClick={exportHistoryCsv}>
+          Export CSV
+        </Button>
+      ),
+    [tab, generate, date, exportHistoryCsv],
+  );
+  useRegisterHeaderAction(headerAction);
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Milk Collections"
-        description="Record and review daily farmer milk collections"
-        actions={
-          tab === 'daily' ? (
-            <Button
-              className="min-h-11"
-              loading={generate.isPending}
-              onClick={() => generate.mutate(date)}
-            >
-              Generate day
-            </Button>
-          ) : (
-            <Button variant="outline" className="min-h-11" onClick={exportHistoryCsv}>
-              Export CSV
-            </Button>
-          )
-        }
-      />
+      <PageHeader title="Milk Collections" />
 
       <Tabs value={tab} onValueChange={(v) => set({ tab: v })}>
         <TabsList>
@@ -361,23 +363,73 @@ export default function MilkCollectionsPage() {
         </TabsContent>
 
         <TabsContent value="history" className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Select aria-label="Supplier" value={hSupplier} onChange={(e) => set({ hSupplier: e.target.value, page: '' })}>
-              <option value="">All suppliers</option>
-              {(suppliersQuery.data ?? []).map((s) => (
-                <option key={getId(s)} value={getId(s)}>
-                  {s.name}
-                </option>
-              ))}
-            </Select>
-            <Input type="date" aria-label="From date" value={hFrom} onChange={(e) => set({ hFrom: e.target.value, page: '' })} />
-            <Input type="date" aria-label="To date" value={hTo} onChange={(e) => set({ hTo: e.target.value, page: '' })} />
-            <Select aria-label="Session" value={hSession} onChange={(e) => set({ hSession: e.target.value, page: '' })}>
-              <option value="">All sessions</option>
-              <option value="morning">Morning</option>
-              <option value="evening">Evening</option>
-            </Select>
+          <div className="flex flex-col gap-3">
+            <FilterButton
+              activeCount={[Boolean(hSupplier), Boolean(hFrom), Boolean(hTo), Boolean(hStatus)].filter(Boolean).length}
+              onClick={filters.openDrawer}
+              className="w-full sm:w-auto sm:self-start"
+            />
+            <div className="hidden gap-3 md:grid md:grid-cols-4">
+              <Select aria-label="Supplier" value={hSupplier} onChange={(e) => set({ hSupplier: e.target.value, page: '' })}>
+                <option value="">All suppliers</option>
+                {(suppliersQuery.data ?? []).map((s) => (
+                  <option key={getId(s)} value={getId(s)}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+              <Input type="date" aria-label="From date" value={hFrom} onChange={(e) => set({ hFrom: e.target.value, page: '' })} />
+              <Input type="date" aria-label="To date" value={hTo} onChange={(e) => set({ hTo: e.target.value, page: '' })} />
+              <Select aria-label="Status" value={hStatus} onChange={(e) => set({ hStatus: e.target.value, page: '' })}>
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+              </Select>
+            </div>
           </div>
+
+          <FilterDrawer
+            open={filters.open}
+            onOpenChange={filters.setOpen}
+            activeCount={[Boolean(hSupplier), Boolean(hFrom), Boolean(hTo), Boolean(hStatus)].filter(Boolean).length}
+            onApply={() => {
+              set({
+                hSupplier: filters.draft.hSupplier,
+                hFrom: filters.draft.hFrom,
+                hTo: filters.draft.hTo,
+                hStatus: filters.draft.hStatus,
+                page: '',
+              });
+              filters.setOpen(false);
+            }}
+            onReset={() => filters.setDraft({ hSupplier: '', hFrom: '', hTo: '', hStatus: '' })}
+          >
+            <FormField label="Supplier">
+              <Select aria-label="Supplier" value={filters.draft.hSupplier} onChange={(e) => filters.setField('hSupplier', e.target.value)}>
+                <option value="">All suppliers</option>
+                {(suppliersQuery.data ?? []).map((s) => (
+                  <option key={getId(s)} value={getId(s)}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="From date">
+                <Input type="date" aria-label="From date" value={filters.draft.hFrom} onChange={(e) => filters.setField('hFrom', e.target.value)} />
+              </FormField>
+              <FormField label="To date">
+                <Input type="date" aria-label="To date" value={filters.draft.hTo} onChange={(e) => filters.setField('hTo', e.target.value)} />
+              </FormField>
+            </div>
+            <FormField label="Status">
+              <Select aria-label="Status" value={filters.draft.hStatus} onChange={(e) => filters.setField('hStatus', e.target.value)}>
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+              </Select>
+            </FormField>
+          </FilterDrawer>
 
           <Card>
             <CardContent className="flex flex-wrap items-center gap-4 pt-4 text-sm text-slate-600">

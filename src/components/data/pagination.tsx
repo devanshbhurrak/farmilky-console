@@ -27,9 +27,9 @@ export function Pagination({ page, totalPages, total, onChange, className }: Pag
         <Button variant="outline" size="icon" aria-label="Previous page" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           <ChevronLeft />
         </Button>
-        {pages.map((p) =>
+        {pages.map((p, i) =>
           p === '…' ? (
-            <span key={`ellipsis-${Math.random()}`} className="px-1 text-sm text-slate-400">…</span>
+            <span key={`ellipsis-${i}`} className="px-1 text-sm text-slate-400">…</span>
           ) : (
             <Button
               key={p}

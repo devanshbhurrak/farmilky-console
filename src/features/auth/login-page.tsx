@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Milk } from 'lucide-react';
@@ -89,10 +89,7 @@ export function LoginPage() {
             </Button>
           </form>
           <p className="mt-4 text-center text-xs text-slate-500">
-            Authorized staff only. Contact your administrator for access.{' '}
-            <Link to="/" className="text-primary-700 hover:underline">
-              Back to home
-            </Link>
+            Authorized staff only. Contact your administrator for access.
           </p>
         </CardContent>
       </Card>

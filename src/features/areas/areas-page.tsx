@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/data/empty-state';
 import { ErrorState } from '@/components/data/error-state';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -69,6 +70,7 @@ export default function AreasPage() {
     setEditing(null);
     setSheetOpen(true);
   };
+  // kept for the empty-state "Add area" action
 
   const handleFormSubmit = (values: AreaInput) => {
     if (editing) {
@@ -81,20 +83,27 @@ export default function AreasPage() {
     }
   };
 
+  const createAction = React.useMemo(
+    () =>
+      isAdmin ? (
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setSheetOpen(true);
+          }}
+          className="px-3 py-1.5 text-sm"
+        >
+          <Plus aria-hidden />
+          Area
+        </Button>
+      ) : null,
+    [isAdmin, setEditing, setSheetOpen],
+  );
+  useRegisterHeaderAction(createAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Areas"
-        description="Delivery zones, pincodes and agent assignments"
-        actions={
-          isAdmin ? (
-            <Button onClick={openCreate}>
-              <Plus />
-              Add area
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Areas" />
 
       <SearchInput
         value={rawSearch}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { BottomNav } from './bottom-nav';
@@ -8,6 +8,7 @@ import { MobileDrawer } from './mobile-drawer';
 
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const location = useLocation();
 
   return (
     <div className="min-h-dvh bg-surface-inset">
@@ -18,11 +19,13 @@ export function AppShell() {
         Skip to content
       </a>
       <Sidebar />
-      <div className="lg:pl-[var(--sidebar-width)]">
+      <div className="flex min-h-dvh flex-col lg:pl-[var(--sidebar-width)]">
         <TopBar />
         <MobileHeader />
-        <main id="main-content" className="mx-auto w-full max-w-7xl p-4 pb-24 lg:p-6 lg:pb-10 xl:p-8">
-          <Outlet />
+        <main id="main-content" className="mx-auto flex w-full max-w-7xl flex-1 flex-col p-4 pb-24 lg:p-6 lg:pb-10 xl:p-8">
+          <div key={location.pathname} className="page-enter flex flex-1 flex-col">
+            <Outlet />
+          </div>
         </main>
       </div>
       <BottomNav onMore={() => setDrawerOpen(true)} />

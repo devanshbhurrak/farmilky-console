@@ -61,3 +61,21 @@ export interface LedgerEntry {
   referenceId?: string | null;
   paymentType?: string | null;
 }
+
+export interface LedgerSummary {
+  debit: number;
+  credit: number;
+  net: number;
+  count: number;
+  period: {
+    month: number;
+    year: number;
+    startDate: string;
+    endDate: string;
+  };
+}
+
+export interface CustomerLedger {
+  entries: LedgerEntry[];
+  summary: LedgerSummary;
+}

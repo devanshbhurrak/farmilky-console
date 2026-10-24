@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { areasApi } from './api';
+import { areasApi, toArea } from './api';
 import type { AreaInput } from './schemas';
 import type { Area, AreaCustomer } from '@/types/area';
 import { queryKeys } from '@/lib/query-keys';
@@ -65,14 +65,17 @@ function toAreaCustomer(item: unknown, index: number): AreaCustomer {
 export function useAreas() {
   return useQuery({
     queryKey: queryKeys.areas.list(),
-    queryFn: async () => normalizeList<Area>(await areasApi.list()),
+    queryFn: async () => {
+      const { items, meta } = normalizeList<unknown>(await areasApi.list());
+      return { items: items.map(toArea), meta };
+    },
   });
 }
 
 export function useArea(id: string | undefined) {
   return useQuery({
     queryKey: [...queryKeys.areas.all(), 'detail', id ?? ''],
-    queryFn: async () => unwrapData<Area>(await areasApi.get(id ?? '')),
+    queryFn: async () => toArea(unwrapData<unknown>(await areasApi.get(id ?? ''))),
     enabled: Boolean(id),
   });
 }
@@ -146,8 +149,15 @@ export function useAreaCustomers(areaId: string | undefined) {
 export function useUpdateAreaCustomers() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ areaId, customerIds }: { areaId: string; customerIds: string[] }) =>
-      areasApi.updateCustomers(areaId, customerIds),
+    mutationFn: ({
+      areaId,
+      assign,
+      remove,
+    }: {
+      areaId: string;
+      assign: { userId: string; deliverySequence?: number }[];
+      remove: string[];
+    }) => areasApi.updateCustomers(areaId, assign, remove),
     onSuccess: (_data, vars) => {
       toast.success('Delivery order updated');
       void queryClient.invalidateQueries({ queryKey: queryKeys.areas.all() });

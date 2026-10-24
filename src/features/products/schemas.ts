@@ -8,17 +8,14 @@ function emptyToUndefined(value: unknown): unknown {
 
 export const productVariantSchema = z.object({
   label: z.string().trim().min(1, 'Label is required'),
-  quantity: z.preprocess(
-    emptyToUndefined,
-    z.coerce.number().positive('Quantity must be positive').optional(),
-  ),
-  unit: z.string().trim().optional().default(''),
+  quantity: z.coerce.number().positive('Quantity must be positive'),
+  unit: z.enum(PRODUCT_UNITS, { message: 'Unit is required' }),
   price: z.coerce.number().min(0, 'Price cannot be negative'),
   discountedPrice: z.preprocess(
     emptyToUndefined,
     z.coerce.number().min(0, 'Discounted price cannot be negative').optional().nullable(),
   ),
-  stock: z.coerce.number().min(0, 'Stock cannot be negative').default(100),
+  stock: z.coerce.number().int().min(0, 'Stock cannot be negative').default(100),
   isDefault: z.boolean().default(false),
   isAvailable: z.boolean().default(true),
 });
@@ -27,12 +24,14 @@ const imageSchema = z
   .string()
   .trim()
   .optional()
+  .nullable()
   .default('')
   .refine(
     (v) =>
       v === '' ||
+      v === null ||
       v === undefined ||
-      /^(https?:\/\/.+|data:.+|\/.+)$/.test(v),
+      /^(https?:\/\/.+|\/.+)$/.test(v),
     { message: 'Must be a valid URL' },
   );
 
@@ -44,9 +43,12 @@ export const productSchema = z.object({
   basePrice: z.coerce.number().min(0, 'Price cannot be negative'),
   stock: z.preprocess(
     emptyToUndefined,
-    z.coerce.number().min(0, 'Stock cannot be negative').optional(),
+    z.coerce.number().int().min(0, 'Stock cannot be negative').optional(),
   ),
-  fatContent: z.string().trim().optional().default(''),
+  fatContent: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().min(0, 'Fat content cannot be negative').optional(),
+  ),
   imageUrl: imageSchema,
   variants: z.array(productVariantSchema).default([]),
   isAvailable: z.boolean().default(true),

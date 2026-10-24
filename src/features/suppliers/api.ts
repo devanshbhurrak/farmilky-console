@@ -7,6 +7,21 @@ type RawRecord = Record<string, unknown>;
 
 export function toSupplier(raw: unknown): Supplier {
   const o = (raw ?? {}) as RawRecord;
+  const sessions: string[] = Array.isArray(o.collectionSessions)
+    ? (o.collectionSessions as string[])
+    : [
+        ...(o.morningSession !== false ? ['morning'] : []),
+        ...(o.eveningSession === true ? ['evening'] : []),
+      ];
+  const flatBank =
+    o.bankAccountNo || o.bankIfsc || o.bankName || o.bankHolderName
+      ? {
+          accountNo: (o.bankAccountNo as string | null | undefined) ?? undefined,
+          ifscCode: (o.bankIfsc as string | null | undefined) ?? undefined,
+          bankName: (o.bankName as string | null | undefined) ?? undefined,
+          holderName: (o.bankHolderName as string | null | undefined) ?? undefined,
+        }
+      : null;
   return {
     id: getId(raw) || String(o.id ?? ''),
     name: String(o.name ?? ''),
@@ -15,16 +30,46 @@ export function toSupplier(raw: unknown): Supplier {
     location: (o.location as string | null | undefined) ?? null,
     pincode: (o.pincode as string | null | undefined) ?? null,
     joiningDate: o.joiningDate !== undefined ? String(o.joiningDate) : null,
-    collectionSessions: (o.collectionSessions as Supplier['collectionSessions']) ?? ['morning', 'evening'],
+    collectionSessions: sessions,
     defaultMorningQty: o.defaultMorningQty !== undefined ? Number(o.defaultMorningQty) : undefined,
-    defaultEveningQty: o.defaultEveningQty !== undefined ? Number(o.defaultEveningQty) : undefined,
+    defaultEveningQty:
+      o.defaultEveningQty !== undefined
+        ? Number(o.defaultEveningQty)
+        : o.expectedEveningQty !== undefined
+          ? Number(o.expectedEveningQty)
+          : undefined,
     defaultRatePerLiter: o.defaultRatePerLiter !== undefined ? Number(o.defaultRatePerLiter) : undefined,
     outstandingAmount: o.outstandingAmount !== undefined ? Number(o.outstandingAmount) : undefined,
     totalPaid: o.totalPaid !== undefined ? Number(o.totalPaid) : undefined,
     isActive: o.isActive !== false,
-    bankDetails: (o.bankDetails as Supplier['bankDetails']) ?? null,
+    bankDetails: (o.bankDetails as Supplier['bankDetails']) ?? flatBank,
     notes: (o.notes as string | null | undefined) ?? null,
     createdAt: String(o.createdAt ?? new Date().toISOString()),
+  };
+}
+
+/** Flatten the form shape (sessions + nested bank details) for the backend. */
+function toSupplierPayload(data: unknown): RawRecord {
+  const o = (data ?? {}) as RawRecord;
+  const bank = (o.bankDetails ?? {}) as RawRecord;
+  const sessions = Array.isArray(o.collectionSessions) ? (o.collectionSessions as string[]) : [];
+  return {
+    name: o.name,
+    phone: o.phone,
+    email: o.email || undefined,
+    location: o.location || undefined,
+    pincode: o.pincode || undefined,
+    joiningDate: o.joiningDate || undefined,
+    morningSession: sessions.includes('morning'),
+    eveningSession: sessions.includes('evening'),
+    defaultMorningQty: o.defaultMorningQty,
+    expectedEveningQty: o.defaultEveningQty,
+    defaultRatePerLiter: o.defaultRatePerLiter,
+    bankAccountNo: bank.accountNo || undefined,
+    bankIfsc: bank.ifscCode || undefined,
+    bankName: bank.bankName || undefined,
+    bankHolderName: bank.holderName || undefined,
+    notes: o.notes || undefined,
   };
 }
 
@@ -80,13 +125,25 @@ export const suppliersApi = {
   },
 
   async create(data: unknown): Promise<Supplier> {
-    const res = await api.post<unknown>('/api/suppliers', data);
-    return toSupplier(unwrapData<unknown>(res));
+    const wantsActive = (data as { isActive?: boolean } | null)?.isActive;
+    const res = await api.post<unknown>('/api/suppliers', toSupplierPayload(data));
+    const created = toSupplier(unwrapData<unknown>(res));
+    if (wantsActive === false) {
+      await api.patch<unknown>(`/api/suppliers/${created.id}/status`, { isActive: false });
+      return { ...created, isActive: false };
+    }
+    return created;
   },
 
   async update(id: string, data: unknown): Promise<Supplier> {
-    const res = await api.put<unknown>(`/api/suppliers/${id}`, data);
-    return toSupplier(unwrapData<unknown>(res));
+    const wantsActive = (data as { isActive?: boolean } | null)?.isActive;
+    const res = await api.put<unknown>(`/api/suppliers/${id}`, toSupplierPayload(data));
+    const updated = toSupplier(unwrapData<unknown>(res));
+    if (wantsActive !== undefined && wantsActive !== updated.isActive) {
+      await api.patch<unknown>(`/api/suppliers/${id}/status`, { isActive: wantsActive });
+      return { ...updated, isActive: wantsActive };
+    }
+    return updated;
   },
 
   async remove(id: string): Promise<void> {
@@ -95,7 +152,8 @@ export const suppliersApi = {
 
   async setStatus(id: string, isActive: boolean): Promise<Supplier> {
     const res = await api.patch<unknown>(`/api/suppliers/${id}/status`, { isActive });
-    return toSupplier(unwrapData<unknown>(res));
+    const data = unwrapData<unknown>(res) as RawRecord | null;
+    return toSupplier(data?.supplier ?? data);
   },
 
   async passbook(id: string): Promise<LedgerEntry[]> {
@@ -119,8 +177,8 @@ export const suppliersApi = {
     try {
       const res = await api.get<RawRecord | number>('/api/supplier-payments/collection-total', {
         supplierId,
-        from: from || undefined,
-        to: to || undefined,
+        startDate: from || undefined,
+        endDate: to || undefined,
       });
       const data = unwrapData<RawRecord | number>(res);
       if (typeof data === 'number') return { total: data };
@@ -136,7 +194,13 @@ export const suppliersApi = {
   },
 
   async recordSupplierPayment(data: SupplierPaymentInput): Promise<unknown> {
-    const res = await api.post<unknown>('/api/supplier-payments', data);
+    const res = await api.post<unknown>('/api/supplier-payments', {
+      supplierId: data.supplierId,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      paymentRef: data.transactionRef || undefined,
+      notes: data.notes || undefined,
+    });
     return unwrapData<unknown>(res);
   },
 
@@ -146,7 +210,13 @@ export const suppliersApi = {
   },
 
   async recordAdjustment(id: string, data: SupplierAdjustmentInput): Promise<unknown> {
-    const res = await api.post<unknown>(`/api/suppliers/${id}/adjustments`, data);
+    const res = await api.post<unknown>(`/api/suppliers/${id}/adjustments`, {
+      amount: data.amount,
+      entryType: data.type,
+      category: data.category ?? 'other',
+      effectiveDate: data.date || undefined,
+      description: data.description || data.category || 'Adjustment',
+    });
     return unwrapData<unknown>(res);
   },
 };

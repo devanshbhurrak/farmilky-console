@@ -1,19 +1,22 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { DataTable, type Column } from '@/components/data/data-table';
 import { FilterBar, type ActiveFilter } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { cn, formatCurrency, getId, titleCase } from '@/lib/utils';
+import { formatCurrency, getId, titleCase } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS, type Product, type ProductListParams } from '@/types/product';
 import { useCreateProduct, useDeleteProduct, useProducts, useUpdateProduct } from './hooks';
 import type { ProductInput } from './schemas';
@@ -36,12 +39,14 @@ function toProductInput(p: Product): ProductInput {
     unit,
     basePrice: Number(p.basePrice ?? p.price ?? 0),
     stock: p.stock ?? undefined,
-    fatContent: p.fatContent ?? '',
+    fatContent: p.fatContent == null || p.fatContent === '' ? undefined : Number(p.fatContent),
     imageUrl: p.imageUrl ?? p.image ?? '',
     variants: (p.variants ?? []).map((v) => ({
       label: v.label,
-      quantity: v.quantity,
-      unit: v.unit ?? '',
+      quantity: Number(v.quantity ?? 1),
+      unit: (PRODUCT_UNITS as readonly string[]).includes(v.unit ?? '')
+        ? (v.unit as ProductInput['unit'])
+        : unit,
       price: v.price,
       discountedPrice: v.discountedPrice ?? undefined,
       stock: v.stock ?? 100,
@@ -67,6 +72,8 @@ export default function ProductsPage() {
   const availability = searchParams.get('availability') ?? 'all';
   const debouncedSearch = useDebounce(rawSearch, 400);
 
+  const filters = useFilterDrawer({ category, availability });
+
   const params: ProductListParams = {
     page,
     limit: PAGE_SIZE,
@@ -85,7 +92,6 @@ export default function ProductsPage() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Product | null>(null);
   const [deleting, setDeleting] = React.useState<Product | null>(null);
-  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const updateUrl = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
@@ -193,20 +199,27 @@ export default function ProductsPage() {
     });
   }
 
+  const createAction = React.useMemo(
+    () =>
+      isAdmin ? (
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setSheetOpen(true);
+          }}
+          className="px-3 py-1.5 text-sm"
+        >
+          <Plus aria-hidden />
+          Product
+        </Button>
+      ) : null,
+    [isAdmin, setEditing, setSheetOpen],
+  );
+  useRegisterHeaderAction(createAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Products"
-        description="Manage the product catalog and variants"
-        actions={
-          isAdmin ? (
-            <Button onClick={openCreate} className="min-h-11">
-              <Plus />
-              Add product
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Products" />
 
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
@@ -216,24 +229,9 @@ export default function ProductsPage() {
             placeholder="Search products…"
             className="flex-1"
           />
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:hidden',
-              filtersOpen ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-              (category !== 'all' || availability !== 'all') && 'border-primary-300',
-            )}
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {(category !== 'all' || availability !== 'all') ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-semibold text-white">
-                {[category !== 'all', availability !== 'all'].filter(Boolean).length}
-              </span>
-            ) : null}
-          </button>
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
         </div>
-        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-3', !filtersOpen && 'hidden md:grid')}>
+        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-2 md:grid">
           <Select
             value={category}
             onChange={(e) => updateUrl({ category: e.target.value === 'all' ? '' : e.target.value, page: null })}
@@ -257,6 +255,48 @@ export default function ProductsPage() {
           </Select>
         </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          updateUrl({
+            category: filters.draft.category === 'all' ? '' : filters.draft.category,
+            availability: filters.draft.availability === 'all' ? '' : filters.draft.availability,
+            page: null,
+          });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ category: 'all', availability: 'all' })}
+      >
+        <FormField label="Category">
+          <Select
+            value={filters.draft.category}
+            onChange={(e) => filters.setField('category', e.target.value)}
+            aria-label="Filter by category"
+          >
+            <option value="all">All categories</option>
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {titleCase(c)}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Availability">
+          <Select
+            value={filters.draft.availability}
+            onChange={(e) => filters.setField('availability', e.target.value)}
+            aria-label="Filter by availability"
+          >
+            <option value="all">All statuses</option>
+            <option value="available">Available</option>
+            <option value="unavailable">Unavailable</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
+
       <FilterBar
         filters={activeFilters}
         onRemove={(key) => updateUrl({ [key]: '', page: null })}

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigation, Phone, Play } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
-import { Badge } from '@/components/ui/badge';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -54,25 +54,26 @@ export default function AgentDashboardPage() {
     { label: 'Pending', value: summary.pending },
   ];
 
+  const startAction = React.useMemo(
+    () =>
+      data?.manifestId ? (
+        <Button onClick={() => navigate(`/agent/manifest/${data.manifestId}`)} className="min-h-11">
+          <Play aria-hidden /> Start Deliveries
+        </Button>
+      ) : null,
+    [data?.manifestId, navigate],
+  );
+  useRegisterHeaderAction(startAction);
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={`Hello, ${user?.name ?? 'Agent'}`}
-        description="Today's delivery route at a glance"
-        actions={
-          data?.manifestId ? (
-            <Button onClick={() => navigate(`/agent/manifest/${data.manifestId}`)} className="min-h-11">
-              <Play aria-hidden /> Start Deliveries
-            </Button>
-          ) : undefined
-        }
-      />
+      <PageHeader title={`Hello, ${user?.name ?? 'Agent'}`} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardHeader>
-              <CardTitle className="text-xs font-medium tracking-wide text-slate-500 uppercase">{s.label}</CardTitle>
+              <CardTitle className="text-xs font-medium text-slate-500">{s.label}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-slate-900">{isLoading ? '…' : s.value}</p>
@@ -140,7 +141,6 @@ export default function AgentDashboardPage() {
                   </Button>
                 </a>
               ) : null}
-              {entry.phone ? <Badge variant="secondary">{entry.phone}</Badge> : null}
             </div>
           </Card>
         ))}

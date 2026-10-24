@@ -7,8 +7,8 @@ import type { Invoice, InvoiceListParams } from '@/types/invoice';
 import type { PaginatedResponse } from '@/types/common';
 
 export interface GenerateInvoiceInput {
-  from: string;
-  to: string;
+  month: number;
+  year: number;
 }
 
 export interface BulkGenerateInput {

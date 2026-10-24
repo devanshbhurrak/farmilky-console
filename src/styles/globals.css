@@ -72,6 +72,10 @@
   }
 }
 
+.page-enter {
+  animation: var(--animate-fade-in);
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
 }
@@ -99,4 +103,9 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* Page roots fill the content column so table pagination sticks to the bottom */
+.page-enter > div {
+  flex-grow: 1;
 }

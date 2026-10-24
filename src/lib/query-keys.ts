@@ -33,6 +33,7 @@ export const queryKeys = {
     all: () => ['payments'] as const,
     list: (filters: unknown) => ['payments', 'list', filters] as const,
     passbook: (userId: string) => ['payments', 'passbook', userId] as const,
+    ledger: (userId: string) => ['payments', 'ledger', userId] as const,
     supplier: (filters: unknown) => ['payments', 'supplier', filters] as const,
   },
   expenses: {

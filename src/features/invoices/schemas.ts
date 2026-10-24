@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 export const generateSchema = z.object({
   userId: z.string().min(1, 'Customer is required'),
-  from: z.string().min(1, 'From date is required'),
-  to: z.string().min(1, 'To date is required'),
+  period: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/, 'Billing month is required'),
 });
 
 export type GenerateInvoiceInput = z.infer<typeof generateSchema>;

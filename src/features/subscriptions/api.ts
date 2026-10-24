@@ -76,12 +76,12 @@ export const subscriptionsApi = {
     }),
   get: (id: string) => api.get<ApiResponse<SubscriptionDetail>>(`/api/subscriptions/admin/${id}`),
   create: (data: CreateSubscriptionRequest) => {
+    const customPrice = data.customPrice ?? data.pricePerUnit;
     const payload = {
       userId: data.userId,
       productId: data.productId,
       variantId: data.variantId,
-      quantityPerDelivery: data.quantityPerDelivery ?? data.quantityPerDay,
-      customPrice: data.customPrice ?? (data.pricePerUnit && data.pricePerUnit > 0 ? data.pricePerUnit : undefined),
+      customPrice: customPrice && customPrice > 0 ? customPrice : undefined,
       startDate: data.startDate,
       deliverySchedule: data.deliverySchedule,
       customDays: data.customDays ?? [],

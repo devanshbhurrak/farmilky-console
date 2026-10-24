@@ -5,22 +5,60 @@ import type { Manifest, ManifestEntry } from '@/types/manifest';
 
 type RawRecord = Record<string, unknown>;
 
+/**
+ * Backend agents are shaped as `{ user, agentProfile, area }`. Older/legacy
+ * payloads are flat. Normalise both so the UI never renders blank rows.
+ */
 export function toAgent(raw: unknown): Agent {
-  const o = (raw ?? {}) as RawRecord;
+  const root = (raw ?? {}) as RawRecord;
+  const user = (root.user && typeof root.user === 'object' ? root.user : root) as RawRecord;
+  const profile = (root.agentProfile ?? user.agentInfo ?? {}) as RawRecord;
+  const area = (root.area ?? profile.assignedArea ?? user.assignedArea) as unknown;
+  const id = getId(user) || getId(root) || String(user.id ?? '');
+
   return {
-    id: getId(raw) || String(o.id ?? ''),
-    name: String(o.name ?? ''),
-    email: (o.email as string | null | undefined) ?? null,
-    phone: (o.phone as string | null | undefined) ?? null,
-    role: o.role !== undefined ? String(o.role) : undefined,
-    isActive: o.isActive !== false,
-    agentInfo: (o.agentInfo as Agent['agentInfo']) ?? null,
+    id,
+    name: String(user.name ?? ''),
+    email: (user.email as string | null | undefined) ?? null,
+    phone: (user.phone as string | null | undefined) ?? null,
+    role: user.role !== undefined ? String(user.role) : undefined,
+    isActive: user.isActive !== false,
+    agentInfo: {
+      joiningDate: (profile.joiningDate as string | null | undefined) ?? null,
+      vehicleType: (profile.vehicleType as string | null | undefined) ?? null,
+      maxCapacity:
+        profile.maxCapacity !== undefined && profile.maxCapacity !== null
+          ? Number(profile.maxCapacity)
+          : null,
+      assignedArea: getId(area) || (typeof area === 'string' ? area : null),
+    },
     assignedAreaName:
-      (o.assignedAreaName as string | null | undefined) ??
-      getName((o.agentInfo as RawRecord | undefined)?.assignedArea, '') ??
+      (root.assignedAreaName as string | null | undefined) ??
+      getName(area, '') ??
       null,
-    createdAt: String(o.createdAt ?? new Date().toISOString()),
+    createdAt: String(user.createdAt ?? new Date().toISOString()),
   };
+}
+
+/** Flatten the nested form shape into the backend's flat agent payload. */
+function toAgentPayload(data: unknown, mode: 'create' | 'update'): RawRecord {
+  const o = (data ?? {}) as RawRecord;
+  const info = (o.agentInfo ?? {}) as RawRecord;
+  const payload: RawRecord = {
+    name: o.name,
+    phone: o.phone,
+    email: o.email || null,
+  };
+  if (o.password) payload.password = o.password;
+  if (mode === 'create') payload.role = o.role ?? 'delivery';
+  if (info.assignedArea) payload.assignedAreaId = info.assignedArea;
+  else if (mode === 'update') payload.assignedAreaId = null;
+  if (info.joiningDate) payload.joiningDate = info.joiningDate;
+  if (info.vehicleType) payload.vehicleType = info.vehicleType;
+  if (info.maxCapacity !== undefined && info.maxCapacity !== null) {
+    payload.maxCapacity = info.maxCapacity;
+  }
+  return payload;
 }
 
 export interface AgentToday {
@@ -64,13 +102,25 @@ export const agentsApi = {
   },
 
   async create(data: unknown): Promise<Agent> {
-    const res = await api.post<unknown>('/api/agents', data);
-    return toAgent(unwrapData<unknown>(res));
+    const wantsActive = (data as { isActive?: boolean } | null)?.isActive;
+    const res = await api.post<unknown>('/api/agents', toAgentPayload(data, 'create'));
+    const created = toAgent(unwrapData<unknown>(res));
+    if (wantsActive === false) {
+      await api.patch<unknown>(`/api/agents/${created.id}/status`, { isActive: false });
+      return { ...created, isActive: false };
+    }
+    return created;
   },
 
   async update(id: string, data: unknown): Promise<Agent> {
-    const res = await api.put<unknown>(`/api/agents/${id}`, data);
-    return toAgent(unwrapData<unknown>(res));
+    const wantsActive = (data as { isActive?: boolean } | null)?.isActive;
+    const res = await api.put<unknown>(`/api/agents/${id}`, toAgentPayload(data, 'update'));
+    const updated = toAgent(unwrapData<unknown>(res));
+    if (wantsActive !== undefined && wantsActive !== updated.isActive) {
+      await api.patch<unknown>(`/api/agents/${id}/status`, { isActive: wantsActive });
+      return { ...updated, isActive: wantsActive };
+    }
+    return updated;
   },
 
   /** Agents are users — delivery config lives on the users admin endpoint. */

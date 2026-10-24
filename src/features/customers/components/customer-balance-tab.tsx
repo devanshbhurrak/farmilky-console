@@ -1,9 +1,11 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/form/form-field';
 import { formatCurrency } from '@/lib/utils';
-import { useCustomer, useCustomerPassbook } from '../hooks';
+import { useCustomer, useCustomerLedger } from '../hooks';
+import { Wallet, Pencil } from 'lucide-react';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -16,12 +18,16 @@ export function CustomerBalanceTab({
   year: yearProp,
   onMonthChange,
   onYearChange,
+  onCollect,
+  onAdjust,
 }: {
   userId: string;
   month?: number;
   year?: number;
   onMonthChange?: (month: number) => void;
   onYearChange?: (year: number) => void;
+  onCollect?: () => void;
+  onAdjust?: () => void;
 }) {
   const now = new Date();
   const [innerMonth, setInnerMonth] = React.useState(now.getMonth() + 1);
@@ -31,11 +37,11 @@ export function CustomerBalanceTab({
   const handleMonthChange = onMonthChange ?? setInnerMonth;
   const handleYearChange = onYearChange ?? setInnerYear;
   const { data: customer } = useCustomer(userId);
-  const { data: entries } = useCustomerPassbook(userId, { month, year });
+  const { data: ledger } = useCustomerLedger(userId, { month, year });
 
-  const debits = (entries ?? []).filter((e) => e.type === 'debit').reduce((s, e) => s + e.amount, 0);
-  const credits = (entries ?? []).filter((e) => e.type !== 'debit').reduce((s, e) => s + e.amount, 0);
-  const net = debits - credits;
+  const debits = ledger?.summary.debit ?? 0;
+  const credits = ledger?.summary.credit ?? 0;
+  const net = ledger?.summary.net ?? debits - credits;
   const balance = Number(customer?.accountBalance ?? customer?.pendingAmount ?? net);
 
   const yearOptions: number[] = [];
@@ -45,8 +51,20 @@ export function CustomerBalanceTab({
   return (
     <div className="flex flex-col gap-4">
       <Card className="bg-primary-600 text-white">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-white">Outstanding balance</CardTitle>
+          <div className="flex gap-2">
+            {onCollect && (
+              <Button size="sm" variant="secondary" onClick={onCollect} className="text-slate-900">
+                <Wallet className="size-4" /> Collect
+              </Button>
+            )}
+            {onAdjust && (
+              <Button size="sm" variant="outline" onClick={onAdjust} className="border-white text-white hover:bg-white/10">
+                <Pencil className="size-4" /> Adjust
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-bold">{formatCurrency(balance)}</p>

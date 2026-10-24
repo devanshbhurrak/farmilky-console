@@ -34,6 +34,12 @@ interface DataTableProps<T> {
   className?: string;
 }
 
+function getColSkeletonWidth(colIdx: number, total: number): number {
+  if (colIdx === 0) return 30;
+  if (colIdx === total - 1) return 15;
+  return colIdx % 2 === 0 ? 25 : 20;
+}
+
 function cellValue<T>(item: T, accessor?: keyof T | string): React.ReactNode {
   if (!accessor) return null;
   const value = (item as Record<string, unknown>)[accessor as string];
@@ -64,9 +70,20 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className={cn('flex flex-col gap-2', className)} aria-busy="true" aria-label="Loading">
-        {Array.from({ length: skeletonRows }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
+      <div className={cn('overflow-x-auto rounded-xl border border-slate-200 bg-white', className)} aria-busy="true" aria-label="Loading">
+        {/* Header row */}
+        <div className="flex gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3">
+          {columns.map((_, i) => (
+            <Skeleton key={i} className="h-3 rounded" style={{ width: `${getColSkeletonWidth(i, columns.length)}%` }} />
+          ))}
+        </div>
+        {/* Data rows */}
+        {Array.from({ length: skeletonRows }).map((_, rowIdx) => (
+          <div key={rowIdx} className="flex gap-4 border-b border-slate-100 px-4 py-3.5 last:border-0">
+            {columns.map((_, colIdx) => (
+              <Skeleton key={colIdx} className="h-4 rounded" style={{ width: `${getColSkeletonWidth(colIdx, columns.length)}%` }} />
+            ))}
+          </div>
         ))}
       </div>
     );
@@ -89,7 +106,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div className={className}>
+    <div className={cn('flex flex-1 flex-col', className)}>
       {/* Mobile cards */}
       {renderCard && (
         <div className="flex flex-col gap-3 md:hidden">
@@ -134,7 +151,7 @@ export function DataTable<T>({
       </div>
 
       {page !== undefined && totalPages !== undefined && onPageChange && (
-        <Pagination page={page} totalPages={totalPages} total={total} onChange={onPageChange} />
+        <Pagination page={page} totalPages={totalPages} total={total} onChange={onPageChange} className="mt-auto" />
       )}
     </div>
   );

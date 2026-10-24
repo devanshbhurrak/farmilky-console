@@ -61,7 +61,6 @@ export default function ManifestDetailPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={`${manifestAgentName(manifest)} · ${formatDate(manifest.date)}`}
-        description={`${manifestAreaName(manifest)} · ${titleCase(manifest.slot ?? '')} slot`}
         breadcrumbs={[
           { label: isAdmin ? 'Manifests' : 'Agent', path: backPath },
           { label: `${manifestAgentName(manifest)} · ${formatDate(manifest.date)}` },

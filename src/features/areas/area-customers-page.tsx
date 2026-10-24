@@ -102,8 +102,13 @@ export default function AreaCustomersPage() {
   };
 
   const save = () => {
+    const assign = assigned.map((c, i) => ({
+      userId: c.customerId,
+      deliverySequence: i + 1,
+    }));
+    const remove = (baseline ?? []).filter((cid) => !currentIds.includes(cid));
     updateMutation.mutate(
-      { areaId: id, customerIds: currentIds },
+      { areaId: id, assign, remove },
       { onSuccess: () => setBaseline(currentIds) },
     );
   };
@@ -114,7 +119,6 @@ export default function AreaCustomersPage() {
     <div className="flex flex-col gap-4 pb-24">
       <PageHeader
         title={area ? `${area.name} — Customers` : 'Area customers'}
-        description="Set the delivery sequence. Customers are visited top to bottom."
         breadcrumbs={[{ label: 'Areas', path: '/areas' }, { label: area?.name ?? 'Customers' }]}
       />
 

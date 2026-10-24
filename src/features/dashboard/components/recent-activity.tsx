@@ -26,6 +26,9 @@ export function RecentActivity({ stats, loading }: { stats: DashboardStat | null
         <CardTitle className="text-sm">Recent activity</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
+        {orders.length > 0 && (
+          <p className="mb-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Orders</p>
+        )}
         {orders.slice(0, 5).map((o) => (
           <div key={String(o.id)} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex min-w-0 items-center gap-2 text-slate-700">
@@ -39,6 +42,10 @@ export function RecentActivity({ stats, loading }: { stats: DashboardStat | null
             </span>
           </div>
         ))}
+        {orders.length > 0 && subs.length > 0 && <div className="my-2 h-px bg-slate-100" />}
+        {subs.length > 0 && (
+          <p className="mb-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Subscriptions</p>
+        )}
         {subs.slice(0, 5).map((s) => (
           <div key={String(s.id)} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex min-w-0 items-center gap-2 text-slate-700">

@@ -23,7 +23,10 @@ export function ReturnActionForm({
   const form = useForm<ReturnActionInput>({
     resolver: zodResolver(returnActionSchema) as unknown as Resolver<ReturnActionInput>,
     defaultValues: {
-      status: (defaultStatus as ReturnActionInput['status']) ?? 'approved',
+      status:
+        defaultStatus === 'approved' || defaultStatus === 'rejected' || defaultStatus === 'completed'
+          ? defaultStatus
+          : 'approved',
       refundAmount: defaultRefund ?? undefined,
       adminNotes: '',
     },
@@ -33,14 +36,13 @@ export function ReturnActionForm({
     <form onSubmit={form.handleSubmit((values) => onSubmit(values as unknown as ReturnActionInput))} className="flex flex-col gap-4">
       <FormField label="Status" required error={form.formState.errors.status?.message}>
         <Select className="mt-1" {...form.register('status')}>
-          <option value="requested">Requested</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
           <option value="completed">Completed</option>
         </Select>
       </FormField>
       <FormField label="Refund amount (₹)" error={form.formState.errors.refundAmount?.message}>
-        <Input type="number" min={0} step="1" className="mt-1" placeholder="0" {...form.register('refundAmount')} />
+        <Input type="number" min={1} step="1" className="mt-1" placeholder="0" {...form.register('refundAmount')} />
       </FormField>
       <FormField label="Admin notes" error={form.formState.errors.adminNotes?.message}>
         <Textarea className="mt-1" rows={3} placeholder="Optional notes…" {...form.register('adminNotes')} />

@@ -79,13 +79,16 @@ export function CustomerForm({
             <Select {...register('role')}>
               <option value="customer">Customer</option>
               <option value="agent">Agent</option>
+              <option value="delivery">Delivery</option>
+              <option value="delivery_partner">Delivery partner</option>
+              <option value="supplier">Supplier</option>
               <option value="admin">Admin</option>
             </Select>
           </FormField>
           <FormField label={mode === 'create' ? 'Password' : 'New password'} required={mode === 'create'} error={errors.password?.message}>
             <Input
               type="password"
-              placeholder={mode === 'create' ? 'Min 6 characters' : 'Leave blank to keep existing'}
+              placeholder={mode === 'create' ? 'Min 8, 1 uppercase, 1 number' : 'Leave blank to keep existing'}
               {...register('password')}
             />
           </FormField>

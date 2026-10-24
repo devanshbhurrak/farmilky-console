@@ -1,7 +1,13 @@
 import { api } from '@/lib/api-client';
 import { getId, normalizeList, unwrapData } from '@/lib/utils';
 import type { Area } from '@/types/area';
-import type { Customer, CustomerListParams, LedgerEntry } from '@/types/customer';
+import type {
+  Customer,
+  CustomerLedger,
+  CustomerListParams,
+  LedgerEntry,
+  LedgerSummary,
+} from '@/types/customer';
 import type { Order } from '@/types/order';
 import type { Product } from '@/types/product';
 import type { Subscription } from '@/types/subscription';
@@ -10,46 +16,108 @@ type RawRecord = Record<string, unknown>;
 
 function toCustomer(raw: unknown): Customer {
   const o = (raw ?? {}) as RawRecord;
-  const id = getId(raw) || String(o.id ?? '');
+  const userObj = (o.user && typeof o.user === 'object' ? o.user : o) as RawRecord;
+  const id = getId(userObj) || String(userObj.id ?? '');
   return {
     id,
-    name: String(o.name ?? ''),
-    email: (o.email as string | null | undefined) ?? null,
-    phone: (o.phone as string | null | undefined) ?? null,
-    role: String(o.role ?? 'customer'),
-    isActive: o.isActive !== false,
-    addresses: (o.addresses as Customer['addresses']) ?? (o.address ? [o.address as Customer['addresses'] extends (infer U)[] | undefined ? U : never] : undefined),
-    accountBalance: Number(o.accountBalance ?? o.pendingAmount ?? 0),
-    pendingAmount: Number(o.pendingAmount ?? o.accountBalance ?? 0),
-    totalSpent: o.totalSpent !== undefined ? Number(o.totalSpent) : undefined,
-    areaId: (o.areaId as string | null | undefined) ?? null,
-    areaName:
-      (o.areaName as string | null | undefined) ??
-      (o.deliveryConfig as { assignedAreaName?: string } | null | undefined)?.assignedAreaName ??
+    name: String(userObj.name ?? ''),
+    email: (userObj.email as string | null | undefined) ?? null,
+    phone: (userObj.phone as string | null | undefined) ?? null,
+    role: String(userObj.role ?? 'customer'),
+    isActive: userObj.isActive !== false,
+    addresses: (userObj.addresses as Customer['addresses']) ?? (userObj.address ? [userObj.address as Customer['addresses'] extends (infer U)[] | undefined ? U : never] : undefined),
+    accountBalance: Number(userObj.accountBalance ?? userObj.pendingAmount ?? 0),
+    pendingAmount: Number(userObj.pendingAmount ?? userObj.accountBalance ?? 0),
+    totalSpent: userObj.totalSpent !== undefined ? Number(userObj.totalSpent) : undefined,
+    areaId:
+      (userObj.assignedAreaId as string | null | undefined) ??
+      (userObj.areaId as string | null | undefined) ??
       null,
-    deliveryConfig: (o.deliveryConfig as Customer['deliveryConfig']) ?? null,
-    createdAt: String(o.createdAt ?? new Date().toISOString()),
-    updatedAt: o.updatedAt !== undefined ? String(o.updatedAt) : undefined,
+    areaName:
+      (userObj.areaName as string | null | undefined) ??
+      (userObj.deliveryConfig as { assignedAreaName?: string } | null | undefined)?.assignedAreaName ??
+      null,
+    deliveryConfig:
+      (userObj.deliveryConfig as Customer['deliveryConfig']) ??
+      (userObj.assignedAreaId !== undefined || userObj.deliverySequence !== undefined
+        ? {
+            assignedArea:
+              (userObj.assignedAreaId as string | null | undefined) ?? undefined,
+            deliverySequence:
+              userObj.deliverySequence !== undefined
+                ? Number(userObj.deliverySequence)
+                : undefined,
+          }
+        : null),
+    createdAt: String(userObj.createdAt ?? new Date().toISOString()),
+    updatedAt: userObj.updatedAt !== undefined ? String(userObj.updatedAt) : undefined,
   };
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
 }
 
 function toLedgerEntry(raw: unknown, index: number): LedgerEntry {
   const o = (raw ?? {}) as RawRecord;
   const amount = Number(o.amount ?? 0);
-  const rawType = String(o.type ?? o.entryType ?? (amount < 0 ? 'credit' : 'debit')).toLowerCase();
-  const type: 'debit' | 'credit' = rawType.includes('credit') ? 'credit' : 'debit';
+  const rawType = o.entryType ?? o.type;
+  const type: 'debit' | 'credit' =
+    rawType !== undefined && rawType !== null
+      ? String(rawType).toLowerCase().includes('credit')
+        ? 'credit'
+        : 'debit'
+      : amount < 0
+        ? 'credit'
+        : 'debit';
   return {
     id: getId(raw) || `ledger-${index}`,
-    date: String(o.date ?? o.createdAt ?? new Date().toISOString()),
-    description: String(o.description ?? o.notes ?? o.category ?? 'Entry'),
-    category: o.category !== undefined ? String(o.category) : undefined,
+    date: String(o.effectiveDate ?? o.date ?? o.receivedDate ?? o.createdAt ?? new Date().toISOString()),
+    description: String(o.description ?? o.notes ?? o.category ?? o.txnCategory ?? 'Entry'),
+    category: stringOrNull(o.category) ?? stringOrNull(o.txnCategory) ?? stringOrNull(o.txnType) ?? undefined,
     type,
     amount: Math.abs(Number.isNaN(amount) ? 0 : amount),
-    transactionId: (o.transactionId as string | null | undefined) ?? null,
-    notes: (o.notes as string | null | undefined) ?? null,
+    transactionId: stringOrNull(o.paymentRef) ?? stringOrNull(o.transactionId) ?? stringOrNull(o.txnNumber),
+    notes: stringOrNull(o.notes),
     recordedBy: o.recordedBy !== undefined ? String(o.recordedBy) : null,
     referenceId: o.referenceId !== undefined ? String(o.referenceId) : null,
-    paymentType: o.paymentType !== undefined ? String(o.paymentType) : null,
+    paymentType: stringOrNull(o.paymentMethod) ?? stringOrNull(o.paymentType),
+  };
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function buildLedgerSummary(
+  raw: unknown,
+  entries: LedgerEntry[],
+  period: { month: number; year: number; startDate: string; endDate: string },
+): LedgerSummary {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as RawRecord;
+  const computedDebit = entries.filter((e) => e.type === 'debit').reduce((sum, e) => sum + e.amount, 0);
+  const computedCredit = entries.filter((e) => e.type === 'credit').reduce((sum, e) => sum + e.amount, 0);
+  const debit = roundMoney(finiteNumber(o.debit) ?? computedDebit);
+  const credit = roundMoney(finiteNumber(o.credit) ?? computedCredit);
+  const count = finiteNumber(o.count) ?? entries.length;
+  const rawPeriod = (o.period && typeof o.period === 'object' ? o.period : {}) as RawRecord;
+  return {
+    debit,
+    credit,
+    net: roundMoney(finiteNumber(o.net) ?? debit - credit),
+    count,
+    period: {
+      month: finiteNumber(rawPeriod.month) ?? period.month,
+      year: finiteNumber(rawPeriod.year) ?? period.year,
+      startDate: stringOrNull(rawPeriod.startDate) ?? period.startDate,
+      endDate: stringOrNull(rawPeriod.endDate) ?? period.endDate,
+    },
   };
 }
 
@@ -66,6 +134,33 @@ function unwrapArray<T>(response: unknown, nestedKeys: string[] = []): T[] {
     }
   }
   return [];
+}
+
+interface CustomerFormData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  isActive?: boolean;
+  password?: string;
+  deliveryConfig?: { assignedArea?: string; deliverySequence?: number };
+}
+
+function toCustomerPayload(data: unknown, mode: 'create' | 'update'): RawRecord {
+  const o = (data ?? {}) as CustomerFormData;
+  const payload: RawRecord = {
+    name: o.name,
+    phone: o.phone,
+    email: o.email || undefined,
+    role: o.role,
+  };
+  if (o.password) payload.password = o.password;
+  if (mode === 'update') payload.isActive = o.isActive;
+  const area = o.deliveryConfig?.assignedArea;
+  if (area) payload.assignedAreaId = area;
+  const seq = o.deliveryConfig?.deliverySequence;
+  if (seq !== undefined && !Number.isNaN(seq)) payload.deliverySequence = seq;
+  return payload;
 }
 
 export interface RecordPaymentInput {
@@ -103,12 +198,12 @@ export const customersApi = {
   },
 
   async create(data: unknown): Promise<Customer> {
-    const res = await api.post<unknown>('/api/users/admin/create', data);
+    const res = await api.post<unknown>('/api/users/admin/create', toCustomerPayload(data, 'create'));
     return toCustomer(unwrapData<unknown>(res));
   },
 
   async update(id: string, data: unknown): Promise<Customer> {
-    const res = await api.put<unknown>(`/api/users/admin/${id}`, data);
+    const res = await api.put<unknown>(`/api/users/admin/${id}`, toCustomerPayload(data, 'update'));
     return toCustomer(unwrapData<unknown>(res));
   },
 
@@ -134,6 +229,37 @@ export const customersApi = {
       year: params.year,
     });
     return unwrapArray<unknown>(res, ['ledger', 'payments']).map(toLedgerEntry);
+  },
+
+  /**
+   * Entire month ledger in a single request: every transaction plus the
+   * debit/credit/net totals. Unlike `passbook` this is not paginated, so the
+   * summary always reflects the full month.
+   */
+  async customerLedger(
+    userId: string,
+    params: { month?: number; year?: number } = {},
+  ): Promise<CustomerLedger> {
+    const now = new Date();
+    const month = params.month ?? now.getMonth() + 1;
+    const year = params.year ?? now.getFullYear();
+    const res = await api.get<unknown>(`/api/payments/${userId}/ledger`, { month, year });
+    const payload = unwrapData<unknown>(res);
+    const obj = (payload && typeof payload === 'object' ? payload : {}) as RawRecord;
+    const rawEntries = Array.isArray(obj.entries)
+      ? obj.entries
+      : Array.isArray(obj.ledger)
+        ? obj.ledger
+        : [];
+    const entries = rawEntries.map(toLedgerEntry);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const period = {
+      month,
+      year,
+      startDate: `${year}-${String(month).padStart(2, '0')}-01`,
+      endDate: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    };
+    return { entries, summary: buildLedgerSummary(obj.summary, entries, period) };
   },
 
   async recordPayment(data: RecordPaymentInput): Promise<unknown> {

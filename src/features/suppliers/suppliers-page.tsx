@@ -2,10 +2,13 @@ import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { FilterBar } from '@/components/data/filter-bar';
 import type { ActiveFilter } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -71,6 +74,8 @@ export default function SuppliersPage() {
   const page = Number(params.get('page') ?? 1) || 1;
   const debouncedSearch = useDebounce(search, 400);
 
+  const filters = useFilterDrawer({ status, balance: balanceFilter });
+
   function update(next: Record<string, string>) {
     const sp = new URLSearchParams(params);
     for (const [k, v] of Object.entries(next)) {
@@ -86,6 +91,16 @@ export default function SuppliersPage() {
     search: debouncedSearch || undefined,
   });
   const createMutation = useCreateSupplier();
+
+  const createAction = React.useMemo(
+    () => (
+      <Button onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm">
+        <Plus aria-hidden /> Supplier
+      </Button>
+    ),
+    [setCreateOpen]
+  );
+  useRegisterHeaderAction(createAction);
   const updateMutation = useUpdateSupplier();
   const deleteMutation = useDeleteSupplier();
 
@@ -166,29 +181,52 @@ export default function SuppliersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Suppliers"
-        description="Milk suppliers, rates and payouts"
-        actions={
-          <Button onClick={() => setCreateOpen(true)} className="min-h-11">
-            <Plus aria-hidden /> New supplier
-          </Button>
-        }
-      />
+      <PageHeader title="Suppliers" />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search suppliers…" />
-        <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </Select>
-        <Select value={balanceFilter} onChange={(e) => update({ balance: e.target.value, page: '1' })} aria-label="Balance filter">
-          <option value="all">Any balance</option>
-          <option value="due">Due</option>
-          <option value="clear">Clear</option>
-        </Select>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search suppliers…" className="flex-1" />
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
+        </div>
+        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-2 md:grid">
+          <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={balanceFilter} onChange={(e) => update({ balance: e.target.value, page: '1' })} aria-label="Balance filter">
+            <option value="all">Any balance</option>
+            <option value="due">Due</option>
+            <option value="clear">Clear</option>
+          </Select>
+        </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          update({ status: filters.draft.status, balance: filters.draft.balance, page: '1' });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: 'all', balance: 'all' })}
+      >
+        <FormField label="Status">
+          <Select value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)} aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </FormField>
+        <FormField label="Balance">
+          <Select value={filters.draft.balance} onChange={(e) => filters.setField('balance', e.target.value)} aria-label="Balance filter">
+            <option value="all">Any balance</option>
+            <option value="due">Due</option>
+            <option value="clear">Clear</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <FilterBar
         filters={activeFilters}

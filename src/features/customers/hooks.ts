@@ -85,6 +85,21 @@ export function useCustomerPassbook(userId: string | undefined, opts?: { month?:
   });
 }
 
+/**
+ * Month ledger with totals. Keyed by period and deliberately not using
+ * placeholder data so switching months never shows the previous month's rows.
+ */
+export function useCustomerLedger(
+  userId: string | undefined,
+  opts: { month: number; year: number },
+) {
+  return useQuery({
+    queryKey: [...queryKeys.payments.ledger(userId ?? ''), { month: opts.month, year: opts.year }],
+    queryFn: () => customersApi.customerLedger(userId as string, opts),
+    enabled: !!userId,
+  });
+}
+
 export function useRecordPayment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -92,6 +107,7 @@ export function useRecordPayment() {
     onSuccess: (_data, variables) => {
       toast.success('Payment recorded');
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.passbook(variables.userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.ledger(variables.userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(variables.userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all() });
     },
@@ -107,6 +123,7 @@ export function useRecordAdjustment() {
     onSuccess: (_data, variables) => {
       toast.success('Balance adjusted');
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.passbook(variables.userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.ledger(variables.userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(variables.userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all() });
     },

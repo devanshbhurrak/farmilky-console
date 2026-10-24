@@ -56,12 +56,16 @@ function attemptTokenRefresh(): Promise<boolean> {
 
 async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const isFormData = options.body instanceof FormData;
+
   const fetchOpts: RequestInit = {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+    headers: isFormData
+      ? {}
+      : {
+          'Content-Type': 'application/json',
+          ...(options.headers ?? {}),
+        },
     ...options,
   };
   let response: Response;
@@ -126,7 +130,7 @@ export const api = {
   post: <T>(path: string, body?: unknown, opts?: { idempotent?: boolean }) =>
     apiClient<T>(path, {
       method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
       headers: opts?.idempotent ? idempotencyHeaders() : undefined,
     }),
   put: <T>(path: string, body?: unknown) =>

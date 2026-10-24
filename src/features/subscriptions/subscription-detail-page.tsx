@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, Phone } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/data/stat-card';
@@ -10,7 +10,7 @@ import { ErrorState } from '@/components/data/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
-import { formatCurrency, formatDate, getErrorMessage, getName, getPhone, titleCase } from '@/lib/utils';
+import { formatCurrency, formatDate, getErrorMessage, getName, titleCase } from '@/lib/utils';
 import { useSubscription, useSubscriptionHistory, useUpdateSubscription, useUpdateSubscriptionStatus } from './hooks';
 import type { SubscriptionInput } from './schemas';
 import { SubscriptionForm } from './components/subscription-form';
@@ -81,8 +81,6 @@ export default function SubscriptionDetailPage() {
     );
   }
 
-  const customerName = getName(subscription.userId, subscription.customerName ?? '—');
-  const phone = getPhone(subscription.userId);
   const productName = getName(subscription.productId, subscription.productName ?? '—');
 
   const handleEdit = (values: SubscriptionInput) => {
@@ -102,19 +100,10 @@ export default function SubscriptionDetailPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={productName}
-        description={`${customerName}${phone ? ` · ${phone}` : ''}`}
         breadcrumbs={[{ label: 'Subscriptions', path: '/subscriptions' }, { label: productName }]}
         actions={
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={subscription.status} />
-            {phone && (
-              <a
-                href={`tel:${phone}`}
-                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium whitespace-nowrap text-slate-700 transition-colors outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 [&_svg]:size-4 [&_svg]:shrink-0"
-              >
-                <Phone className="size-4" /> {phone}
-              </a>
-            )}
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="min-h-11">
               <Pencil /> Edit
             </Button>

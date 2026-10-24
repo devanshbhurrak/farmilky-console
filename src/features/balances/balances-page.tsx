@@ -227,7 +227,7 @@ export default function BalancesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Balances" description="Customer outstanding balances at a glance" />
+      <PageHeader title="Balances" />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Total debt" value={formatCurrency(stats.debt)} valueClassName="text-red-600" />

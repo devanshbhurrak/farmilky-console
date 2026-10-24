@@ -31,4 +31,11 @@ export const EXPENSE_CATEGORIES = [
   'miscellaneous',
 ] as const;
 
-export const EXPENSE_PAYMENT_METHODS = ['cash', 'upi', 'bank_transfer', 'card', 'other'] as const;
+export const EXPENSE_PAYMENT_METHODS = [
+  'cash',
+  'upi',
+  'bank_transfer',
+  'card',
+  'online',
+  'COD',
+] as const;

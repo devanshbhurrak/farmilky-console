@@ -18,7 +18,15 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        // Promote the fixed bottom nav to its own compositor layer so it stays
+        // pinned at the viewport bottom while scrolling. Prevents iOS Safari
+        // from jumping/sliding a fixed + backdrop-blur element off the bottom
+        // (most noticeable on the tall, scrollable dashboard).
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+      }}
       aria-label="Mobile"
     >
       <div className="grid h-[var(--bottom-nav-height)] grid-cols-5">
@@ -30,7 +38,9 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
             className={({ isActive }) =>
               cn(
                 'flex flex-col items-center justify-center gap-1 p-2 text-[11px] font-medium',
-                isActive ? 'text-primary-700' : 'text-slate-500',
+                isActive
+                  ? 'text-primary-700 font-semibold border-t-2 border-primary-600'
+                  : 'text-slate-500 border-t-2 border-transparent',
               )
             }
           >

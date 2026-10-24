@@ -57,7 +57,7 @@ export function MetricCards({
     },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {cards.map((c) => (
         <Card key={c.label}>
           <CardHeader className="flex flex-row items-center gap-2 pb-1">

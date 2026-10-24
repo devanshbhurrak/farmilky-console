@@ -3,10 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, UserCog } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { FilterBar } from '@/components/data/filter-bar';
 import type { ActiveFilter } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -34,6 +37,8 @@ export default function AgentsPage() {
   const page = Number(params.get('page') ?? 1) || 1;
   const debouncedSearch = useDebounce(search, 400);
 
+  const filters = useFilterDrawer({ status });
+
   function update(next: Record<string, string>) {
     const sp = new URLSearchParams(params);
     for (const [k, v] of Object.entries(next)) {
@@ -49,6 +54,16 @@ export default function AgentsPage() {
     search: debouncedSearch || undefined,
   });
   const createMutation = useCreateAgent();
+
+  const createAction = React.useMemo(
+    () => (
+      <Button onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm">
+        <Plus aria-hidden /> Agent
+      </Button>
+    ),
+    [setCreateOpen]
+  );
+  useRegisterHeaderAction(createAction);
 
   const { data: areas } = useQuery({
     queryKey: queryKeys.areas.list(),
@@ -110,25 +125,42 @@ export default function AgentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Agents"
-        description="Delivery partners, areas and availability"
-        actions={
-          <Button onClick={() => setCreateOpen(true)} className="min-h-11">
-            <Plus aria-hidden /> New agent
-          </Button>
-        }
-      />
+      <PageHeader title="Agents" />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search agents…" />
-        <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter">
-          <option value="all">All agents</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="unassigned">Unassigned area</option>
-        </Select>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <SearchInput value={search} onChange={(v) => update({ search: v, page: '1' })} placeholder="Search agents…" className="flex-1" />
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
+        </div>
+        <div className="hidden md:block">
+          <Select value={status} onChange={(e) => update({ status: e.target.value, page: '1' })} aria-label="Status filter" className="md:max-w-xs">
+            <option value="all">All agents</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="unassigned">Unassigned area</option>
+          </Select>
+        </div>
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          update({ status: filters.draft.status, page: '1' });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: 'all' })}
+      >
+        <FormField label="Status">
+          <Select value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)} aria-label="Status filter">
+            <option value="all">All agents</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="unassigned">Unassigned area</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <FilterBar
         filters={activeFilters}

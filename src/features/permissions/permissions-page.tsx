@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -84,6 +86,8 @@ export default function PermissionsPage() {
   const userSearch = params.get('q') ?? '';
   const userRole = params.get('userRole') ?? 'agent';
 
+  const filters = useFilterDrawer({ userRole });
+
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) {
@@ -143,7 +147,7 @@ export default function PermissionsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Permissions" description="Manage role defaults and per-user overrides" />
+      <PageHeader title="Permissions" />
 
       <Tabs value={tab} onValueChange={(v) => set({ tab: v })}>
         <TabsList>
@@ -191,15 +195,40 @@ export default function PermissionsPage() {
         </TabsContent>
 
         <TabsContent value="users" className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <SearchInput value={userSearch} onChange={(v) => set({ q: v })} placeholder="Search users…" className="md:max-w-70" />
-            <Select aria-label="Role filter" value={userRole} onChange={(e) => set({ userRole: e.target.value })} className="md:max-w-55">
-              <option value="">All roles</option>
-              <option value="agent">Agent</option>
-              <option value="delivery">Delivery</option>
-              <option value="delivery_partner">Delivery partner</option>
-            </Select>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <SearchInput value={userSearch} onChange={(v) => set({ q: v })} placeholder="Search users…" className="flex-1 md:max-w-70" />
+              <FilterButton activeCount={userRole ? 1 : 0} onClick={filters.openDrawer} />
+            </div>
+            <div className="hidden md:block">
+              <Select aria-label="Role filter" value={userRole} onChange={(e) => set({ userRole: e.target.value })} className="md:max-w-55">
+                <option value="">All roles</option>
+                <option value="agent">Agent</option>
+                <option value="delivery">Delivery</option>
+                <option value="delivery_partner">Delivery partner</option>
+              </Select>
+            </div>
           </div>
+
+          <FilterDrawer
+            open={filters.open}
+            onOpenChange={filters.setOpen}
+            activeCount={userRole ? 1 : 0}
+            onApply={() => {
+              set({ userRole: filters.draft.userRole });
+              filters.setOpen(false);
+            }}
+            onReset={() => filters.setDraft({ userRole: '' })}
+          >
+            <FormField label="Role">
+              <Select aria-label="Role filter" value={filters.draft.userRole} onChange={(e) => filters.setField('userRole', e.target.value)}>
+                <option value="">All roles</option>
+                <option value="agent">Agent</option>
+                <option value="delivery">Delivery</option>
+                <option value="delivery_partner">Delivery partner</option>
+              </Select>
+            </FormField>
+          </FilterDrawer>
 
           <div className="flex flex-col gap-3">
             {(usersQuery.data ?? []).map((u) => {

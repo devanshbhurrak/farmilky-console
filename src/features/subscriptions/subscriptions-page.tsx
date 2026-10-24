@@ -5,10 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { SearchInput } from '@/components/data/search-input';
 import { FilterBar } from '@/components/data/filter-bar';
+import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
+import { FormField } from '@/components/form/form-field';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -35,6 +38,8 @@ export default function SubscriptionsPage() {
 
   const debouncedSearch = useDebounce(search, 400);
 
+  const filters = useFilterDrawer({ status, schedule });
+
   const updateParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -51,6 +56,16 @@ export default function SubscriptionsPage() {
     schedule: schedule || undefined,
   });
   const createMutation = useCreateSubscription();
+
+  const createAction = useMemo(
+    () => (
+      <Button onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm">
+        <Plus aria-hidden /> Subscription
+      </Button>
+    ),
+    [setCreateOpen]
+  );
+  useRegisterHeaderAction(createAction);
 
   const items = listQuery.data?.items ?? [];
   const meta = listQuery.data?.meta;
@@ -129,62 +144,92 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Subscriptions"
-        description="Manage recurring milk subscriptions"
-        actions={
-          <Button onClick={() => setCreateOpen(true)} className="min-h-11">
-            <Plus /> New subscription
-          </Button>
-        }
-      />
+      <PageHeader title="Subscriptions" />
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex gap-2">
           <SearchInput
             value={search}
             onChange={(v) => updateParam('search', v)}
             placeholder="Search subscriptions…"
-            className="sm:max-w-xs"
+            className="flex-1 sm:max-w-xs"
           />
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            <Select
-              aria-label="Status filter"
-              value={status}
-              onChange={(e) => updateParam('status', e.target.value)}
-              className="sm:max-w-44"
-            >
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
-            <Select
-              aria-label="Schedule filter"
-              value={schedule}
-              onChange={(e) => updateParam('schedule', e.target.value)}
-              className="sm:max-w-44"
-            >
-              <option value="">All schedules</option>
-              <option value="daily">Daily</option>
-              <option value="alternate">Alternate</option>
-              <option value="weekly">Weekly</option>
-              <option value="custom">Custom</option>
-            </Select>
-            {items.length > 0 && (
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-600">
-                <Checkbox checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
-                Select all
-              </label>
-            )}
-          </div>
+          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
         </div>
+        <div className="hidden flex-wrap items-center gap-2 sm:flex">
+          <Select
+            aria-label="Status filter"
+            value={status}
+            onChange={(e) => updateParam('status', e.target.value)}
+            className="sm:max-w-44"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+          <Select
+            aria-label="Schedule filter"
+            value={schedule}
+            onChange={(e) => updateParam('schedule', e.target.value)}
+            className="sm:max-w-44"
+          >
+            <option value="">All schedules</option>
+            <option value="daily">Daily</option>
+            <option value="alternate">Alternate</option>
+            <option value="weekly">Weekly</option>
+            <option value="custom">Custom</option>
+          </Select>
+        </div>
+        {items.length > 0 && (
+          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-slate-600">
+            <Checkbox checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
+            Select all
+          </label>
+        )}
         <FilterBar
           filters={activeFilters}
           onRemove={(key) => updateParam(key, '')}
           onClearAll={() => setSearchParams({}, { replace: true })}
         />
       </div>
+
+      <FilterDrawer
+        open={filters.open}
+        onOpenChange={filters.setOpen}
+        activeCount={activeFilters.length}
+        onApply={() => {
+          const next = new URLSearchParams(searchParams);
+          const apply = (key: string, value: string) => {
+            if (value) next.set(key, value);
+            else next.delete(key);
+          };
+          apply('status', filters.draft.status);
+          apply('schedule', filters.draft.schedule);
+          next.delete('page');
+          setSearchParams(next, { replace: true });
+          filters.setOpen(false);
+        }}
+        onReset={() => filters.setDraft({ status: '', schedule: '' })}
+      >
+        <FormField label="Status">
+          <Select aria-label="Status filter" value={filters.draft.status} onChange={(e) => filters.setField('status', e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+        </FormField>
+        <FormField label="Schedule">
+          <Select aria-label="Schedule filter" value={filters.draft.schedule} onChange={(e) => filters.setField('schedule', e.target.value)}>
+            <option value="">All schedules</option>
+            <option value="daily">Daily</option>
+            <option value="alternate">Alternate</option>
+            <option value="weekly">Weekly</option>
+            <option value="custom">Custom</option>
+          </Select>
+        </FormField>
+      </FilterDrawer>
 
       <SubscriptionBulkActions selectedIds={selected} onDone={() => setSelected([])} />
 

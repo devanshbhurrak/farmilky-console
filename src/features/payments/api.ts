@@ -103,11 +103,23 @@ export const paymentsApi = {
   supplierPayments: (params?: SupplierPaymentListParams) =>
     api.get<PaginatedResponse<SupplierPayment> | { success: boolean; data: SupplierPayment[] }>(
       '/api/supplier-payments',
-      params as Record<string, string | number | boolean | null | undefined>,
+      {
+        page: params?.page,
+        limit: params?.limit,
+        supplierId: params?.supplierId,
+        fromDate: params?.from || undefined,
+        toDate: params?.to || undefined,
+      },
     ),
 
   recordSupplierPayment: (data: RecordSupplierPaymentInput) =>
-    api.post<{ success: boolean; data: SupplierPayment }>('/api/supplier-payments', data),
+    api.post<{ success: boolean; data: SupplierPayment }>('/api/supplier-payments', {
+      supplierId: data.supplierId,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      paymentRef: data.transactionRef || undefined,
+      notes: data.notes || undefined,
+    }),
 
   /** Returns { total } — empty total on failure so the form still renders. */
   supplierCollectionTotal: async (
@@ -118,7 +130,7 @@ export const paymentsApi = {
     try {
       const res = await api.get<{ success: boolean; data: { total: number } | number }>(
         '/api/supplier-payments/collection-total',
-        { supplierId, from, to },
+        { supplierId, startDate: from || undefined, endDate: to || undefined },
       );
       const data = (res as { data?: unknown }).data ?? res;
       if (typeof data === 'number') return { total: data };

@@ -8,7 +8,7 @@ import type { Agent } from '@/types/agent';
 
 export function agentAreaName(agent: Agent): string | null {
   const raw = agent.agentInfo?.assignedArea;
-  if (typeof raw === 'string') return (raw || agent.assignedAreaName) ?? null;
+  if (typeof raw === 'string') return agent.assignedAreaName ?? (raw || null);
   if (raw && typeof raw === 'object') return raw.name ?? null;
   return agent.assignedAreaName ?? null;
 }
