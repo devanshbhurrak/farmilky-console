@@ -25,7 +25,7 @@ import { customersApi } from './api';
 import { CustomerForm } from './components/customer-form';
 import type { AreaOption } from './components/customer-form';
 import { CustomerCard } from './components/customer-table';
-import { customerBalance, enrichCustomersArea } from '../customer-utils';
+import { customerBalance, enrichCustomersArea } from './customer-utils';
 import type { CreateCustomerInput } from './schemas';
 import type { Area } from '@/types/area';
 import type { Customer } from '@/types/customer';

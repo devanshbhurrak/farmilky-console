@@ -42,7 +42,7 @@ import { useCustomer, useUpdateCustomer } from './hooks';
 import { customersApi } from './api';
 import { CustomerForm } from './components/customer-form';
 import type { AreaOption } from './components/customer-form';
-import { customerBalance } from '../customer-utils';
+import { customerBalance } from './customer-utils';
 import { CustomerOrdersTab } from './components/customer-orders-tab';
 import { CustomerSubscriptionsTab } from './components/customer-subscriptions-tab';
 import { AdjustBalanceDialog, CollectPaymentDialog, CustomerPaymentsTab } from './components/customer-payments-tab';

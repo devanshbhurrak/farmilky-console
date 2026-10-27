@@ -22,6 +22,15 @@ export function toSupplier(raw: unknown): Supplier {
           holderName: (o.bankHolderName as string | null | undefined) ?? undefined,
         }
       : null;
+  
+  // Compute outstanding amount from balance if not provided
+  // Backend returns `balance` field (positive = supplier is owed, negative = supplier owes)
+  const balance = o.balance !== undefined ? Number(o.balance) : 0;
+  const outstandingAmount = o.outstandingAmount !== undefined 
+    ? Number(o.outstandingAmount) 
+    : (balance > 0 ? balance : 0);
+  const totalPaid = o.totalPaid !== undefined ? Number(o.totalPaid) : Math.max(0, -balance);
+
   return {
     id: getId(raw) || String(o.id ?? ''),
     name: String(o.name ?? ''),
@@ -39,8 +48,8 @@ export function toSupplier(raw: unknown): Supplier {
           ? Number(o.expectedEveningQty)
           : undefined,
     defaultRatePerLiter: o.defaultRatePerLiter !== undefined ? Number(o.defaultRatePerLiter) : undefined,
-    outstandingAmount: o.outstandingAmount !== undefined ? Number(o.outstandingAmount) : undefined,
-    totalPaid: o.totalPaid !== undefined ? Number(o.totalPaid) : undefined,
+    outstandingAmount,
+    totalPaid,
     isActive: o.isActive !== false,
     bankDetails: (o.bankDetails as Supplier['bankDetails']) ?? flatBank,
     notes: (o.notes as string | null | undefined) ?? null,

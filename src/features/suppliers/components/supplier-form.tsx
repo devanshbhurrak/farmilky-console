@@ -14,6 +14,9 @@ const SESSIONS = [
   { value: 'evening', label: 'Evening' },
 ] as const;
 
+// Default to morning session only to match backend defaults
+const DEFAULT_SESSIONS = ['morning'] as const;
+
 export function SupplierForm({
   defaultValues,
   onSubmit,
@@ -32,7 +35,7 @@ export function SupplierForm({
       location: '',
       pincode: '',
       joiningDate: '',
-      collectionSessions: ['morning', 'evening'],
+      collectionSessions: DEFAULT_SESSIONS,
       defaultMorningQty: undefined,
       defaultEveningQty: undefined,
       defaultRatePerLiter: undefined,
