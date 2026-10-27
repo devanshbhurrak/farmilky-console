@@ -24,7 +24,8 @@ import { useCreateCustomer, useCustomers } from './hooks';
 import { customersApi } from './api';
 import { CustomerForm } from './components/customer-form';
 import type { AreaOption } from './components/customer-form';
-import { CustomerCard, customerBalance } from './components/customer-table';
+import { CustomerCard } from './components/customer-table';
+import { customerBalance, enrichCustomersArea } from '../customer-utils';
 import type { CreateCustomerInput } from './schemas';
 import type { Area } from '@/types/area';
 import type { Customer } from '@/types/customer';
@@ -100,6 +101,12 @@ export default function CustomersPage() {
     }
     return items;
   }, [data, status, balanceFilter, sort]);
+
+  // Enrich customers with resolved area names (backend returns area IDs as UUIDs).
+  const enriched = React.useMemo(
+    () => enrichCustomersArea(filtered, areasRes ?? []),
+    [filtered, areasRes],
+  );
 
   const activeFilters: ActiveFilter[] = [];
   if (status !== 'all') activeFilters.push({ key: 'status', label: 'Status', value: status });
@@ -180,7 +187,7 @@ export default function CustomersPage() {
             <option value="due">Due</option>
             <option value="clear">Clear</option>
           </Select>
-          <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort customers">
+          <Select value={sort} onChange={(e) => update({ sort: e.target.value, page: '1' })} aria-label="Sort customers">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="name">Name A–Z</option>
@@ -230,7 +237,7 @@ export default function CustomersPage() {
       />
 
       <DataTable<Customer>
-        data={filtered}
+        data={enriched}
         columns={columns}
         keyExtractor={(c, i) => getId(c) || `customer-${i}`}
         loading={isLoading}

@@ -4,18 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import type { Customer } from '@/types/customer';
+import { customerAddress, customerBalance } from '../customer-utils';
 
-export function customerBalance(c: Customer): number {
-  return Number(c.accountBalance ?? c.pendingAmount ?? 0);
-}
-
-/** Compact single-line address for a customer's primary address, if any. */
-export function customerAddress(c: Customer): string | null {
-  const a = c.addresses?.[0];
-  if (!a) return null;
-  const line = [a.street || a.line1 || a.line2, a.city, a.pincode].filter(Boolean).join(', ');
-  return line || null;
-}
 
 export function CustomerCard({
   customer,

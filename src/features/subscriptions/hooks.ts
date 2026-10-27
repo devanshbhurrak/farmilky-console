@@ -166,13 +166,14 @@ export function useScheduleChange() {
       id,
       data,
     }: {
-      id: string;
-      data: { effectiveDate: string; deliverySchedule?: string; scheduledQty?: number; scheduledPrice?: number; quantityPerDay?: number; slot?: string };
-    }) => subscriptionsApi.scheduleChange(id, {
+      id: string;      data: { effectiveDate: string; deliverySchedule?: string; scheduledQty?: number; scheduledPrice?: number; quantityPerDay?: number; slot?: string };
+    }) =>
+    subscriptionsApi.scheduleChange(id, {
       effectiveDate: data.effectiveDate,
       scheduledQty: data.scheduledQty ?? data.quantityPerDay,
       scheduledPrice: data.scheduledPrice,
       deliverySchedule: data.deliverySchedule,
+      slot: data.slot,
     }),
     onSuccess: () => {
       invalidateSubscriptionQueries(queryClient);
@@ -200,6 +201,7 @@ export function useRecordSubscriptionOutcome() {
     mutationFn: ({ id, data }: { id: string; data: SubscriptionOutcomeInput }) =>
       subscriptionsApi.recordOutcome(id, {
         deliveryDate: data.deliveryDate,
+        slot: data.slot,
         status: data.status,
         actualQuantity: data.actualQuantity,
         reason: data.reason,

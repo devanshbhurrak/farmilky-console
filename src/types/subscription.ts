@@ -20,6 +20,9 @@ export interface Subscription {
   deliverySchedule: ScheduleType;
   customDays?: string[];
   deliverySlot?: DeliverySlot | string;
+  // Per-slot config rows (multi-slot subscriptions). Rows look like
+  // { deliverySlot, quantityPerDelivery }.
+  slots?: Array<{ deliverySlot?: string; quantityPerDelivery?: string | number }>;
   startDate: string;
   pauseFrom?: string | null;
   pauseUntil?: string | null;
@@ -40,6 +43,8 @@ export interface DeliveryHistoryEntry {
   id: string;
   deliveryDate: string;
   status: HistoryStatus | string;
+  slot?: DeliverySlot | string;
+  deliverySlot?: DeliverySlot | string;
   quantity?: number;
   actualQuantity?: number;
   rate?: number;

@@ -12,6 +12,7 @@ import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/compo
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { formatCurrency, formatDate, getErrorMessage, getName, titleCase } from '@/lib/utils';
 import { useSubscription, useSubscriptionHistory, useUpdateSubscription, useUpdateSubscriptionStatus } from './hooks';
+import { slotConfigOf } from './api';
 import type { SubscriptionInput } from './schemas';
 import { SubscriptionForm } from './components/subscription-form';
 import { DeliveryHistory } from './components/delivery-history';
@@ -82,6 +83,10 @@ export default function SubscriptionDetailPage() {
   }
 
   const productName = getName(subscription.productId, subscription.productName ?? '—');
+  // Per-slot config rows (multi-slot subscriptions fall back to the legacy
+  // single-slot fields when no rows exist).
+  const slotConfig = slotConfigOf(subscription);
+  const isMultiSlot = slotConfig.length > 1;
 
   const handleEdit = (values: SubscriptionInput) => {
     if (!id) return;
@@ -132,7 +137,24 @@ export default function SubscriptionDetailPage() {
           </div>
           <div>
             <div className="text-xs text-slate-500">Qty / delivery</div>
-            <div className="font-medium">{subscription.quantityPerDelivery ?? subscription.quantityPerDay}</div>
+            <div className="font-medium">
+              {isMultiSlot
+                ? slotConfig
+                    .map(
+                      (s) =>
+                        `${s.quantityPerDelivery} ${s.slot === 'morning' ? '(AM)' : '(PM)'}`,
+                    )
+                    .join(' + ')
+                : (subscription.quantityPerDelivery ?? subscription.quantityPerDay)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">Slots</div>
+            <div className="font-medium">
+              {slotConfig
+                .map((s) => (s.slot === 'morning' ? 'Morning' : 'Evening'))
+                .join(' + ')}
+            </div>
           </div>
           <div>
             <div className="text-xs text-slate-500">Rate</div>
@@ -169,7 +191,11 @@ export default function SubscriptionDetailPage() {
         </CardContent>
       </Card>
 
-      <DeliveryHistory subscriptionId={id as string} startMonth={subscription.startDate?.slice(0, 7)} />
+      <DeliveryHistory
+        subscriptionId={id as string}
+        startMonth={subscription.startDate?.slice(0, 7)}
+        slots={slotConfig}
+      />
 
       <ScheduleConfig subscription={subscription} />
 
@@ -197,6 +223,7 @@ export default function SubscriptionDetailPage() {
                 customDays: subscription.customDays ?? [],
                 deliverySlot:
                   ((subscription.deliverySlot ?? subscription.slot) === 'evening') ? 'evening' : 'morning',
+                slotRows: subscription.slots,
               }}
               onSubmit={handleEdit}
               submitting={updateMutation.isPending}

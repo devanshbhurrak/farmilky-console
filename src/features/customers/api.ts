@@ -14,6 +14,12 @@ import type { Subscription } from '@/types/subscription';
 
 type RawRecord = Record<string, unknown>;
 
+function toAddressArray(o: RawRecord): Customer['addresses'] {
+  if (Array.isArray(o.addresses)) return o.addresses as Customer['addresses'];
+  if (o.address) return [o.address as Customer['addresses'][number]];
+  return undefined;
+}
+
 function toCustomer(raw: unknown): Customer {
   const o = (raw ?? {}) as RawRecord;
   const userObj = (o.user && typeof o.user === 'object' ? o.user : o) as RawRecord;
@@ -25,7 +31,7 @@ function toCustomer(raw: unknown): Customer {
     phone: (userObj.phone as string | null | undefined) ?? null,
     role: String(userObj.role ?? 'customer'),
     isActive: userObj.isActive !== false,
-    addresses: (userObj.addresses as Customer['addresses']) ?? (userObj.address ? [userObj.address as Customer['addresses'] extends (infer U)[] | undefined ? U : never] : undefined),
+    addresses: toAddressArray(userObj),
     accountBalance: Number(userObj.accountBalance ?? userObj.pendingAmount ?? 0),
     pendingAmount: Number(userObj.pendingAmount ?? userObj.accountBalance ?? 0),
     totalSpent: userObj.totalSpent !== undefined ? Number(userObj.totalSpent) : undefined,
@@ -143,6 +149,7 @@ interface CustomerFormData {
   role?: string;
   isActive?: boolean;
   password?: string;
+  address?: { street?: string; city?: string; pincode?: string };
   deliveryConfig?: { assignedArea?: string; deliverySequence?: number };
 }
 
@@ -160,13 +167,22 @@ function toCustomerPayload(data: unknown, mode: 'create' | 'update'): RawRecord 
   if (area) payload.assignedAreaId = area;
   const seq = o.deliveryConfig?.deliverySequence;
   if (seq !== undefined && !Number.isNaN(seq)) payload.deliverySequence = seq;
+  // Address data is forwarded for forward-compatibility. The current backend
+  // schema (adminCreateUserSchema / adminUpdateUserSchema) does not persist
+  // addresses — they live in the user_addresses table — so these fields are
+  // currently stripped by Zod. Keeping them in the payload means address
+  // persistence will work once the backend accepts them.
+  if (o.address) {
+    const { street, city, pincode } = o.address;
+    if (street || city || pincode) payload.address = { street, city, pincode };
+  }
   return payload;
 }
 
 export interface RecordPaymentInput {
   userId: string;
   amount: number;
-  type?: string;
+  paymentMethod?: string;
   date?: string;
   transactionId?: string;
   notes?: string;

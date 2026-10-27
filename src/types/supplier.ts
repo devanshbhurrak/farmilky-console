@@ -50,3 +50,39 @@ export interface SupplierListParams {
   status?: string;
   balance?: string;
 }
+
+export interface GenerateSummary {
+  created: number;
+  skipped: number;
+  date: string;
+}
+
+export interface ShiftSlotSummary {
+  confirmed: number;
+  total: number;
+  qty: number;
+  amount: number;
+}
+
+export interface TodayShiftSummary {
+  morning: ShiftSlotSummary;
+  evening: ShiftSlotSummary;
+  date: string;
+}
+
+export interface ConfirmResult {
+  collection: MilkCollection;
+  txn: unknown | null;
+}
+
+export interface UpdateResult {
+  collection: MilkCollection;
+  txn: unknown | null;
+}
+
+export interface MissingCollection {
+  date: string;
+  session: CollectionSession;
+  supplierId: string;
+  supplierName: string;
+}

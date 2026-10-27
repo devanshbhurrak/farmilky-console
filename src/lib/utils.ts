@@ -1,8 +1,27 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { API_BASE } from '@/lib/api-client';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Converts a raw storage URL to a publicly-accessible URL the browser can load.
+ *
+ * R2's S3-compatible endpoint (`<account>.r2.cloudflarestorage.com`) requires
+ * authenticated requests — browsers get a 403/400. To avoid storing a separate
+ * proxy column, we route R2 URLs through the backend's authenticated `/api/upload/image/serve`
+ * proxy, which fetches the object server-side and streams it back.
+ *
+ * Non-R2 URLs (already-public CDN/custom-domain URLs, external links) are returned as-is.
+ */
+export function getImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.includes('r2.cloudflarestorage.com')) {
+    return `${API_BASE}/api/upload/image/serve?url=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
 
 const inr = new Intl.NumberFormat('en-IN', {

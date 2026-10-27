@@ -17,7 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useConfirmCollection, useCollectionHistory, useDailyCollections, useGenerateDaily, useUpdateCollection } from './hooks';
+import { useConfirmCollection, useCollectionHistory, useDailyCollections, useGenerateDaily, useBulkConfirm, useUpdateCollection } from './hooks';
 import { milkApi } from './api';
 import { CollectionForm } from './components/collection-form';
 import { ShiftSummary } from './components/shift-summary';
@@ -32,7 +32,7 @@ import {
   getName,
   todayLocal,
 } from '@/lib/utils';
-import type { MilkCollection } from '@/types/supplier';
+import type { MilkCollection, MissingCollection } from '@/types/supplier';
 
 function isConfirmed(c: MilkCollection): boolean {
   if (c.isConfirmed === true) return true;
@@ -128,6 +128,7 @@ export default function MilkCollectionsPage() {
   const generate = useGenerateDaily();
   const confirmMutation = useConfirmCollection();
   const updateMutation = useUpdateCollection();
+  const bulkConfirm = useBulkConfirm();
 
   const suppliersQuery = useQuery({
     queryKey: queryKeys.suppliers.list({ limit: 100 }),
@@ -173,7 +174,7 @@ export default function MilkCollectionsPage() {
 
   const pending = filtered.filter((c) => !isConfirmed(c));
   const confirmed = filtered.filter((c) => isConfirmed(c));
-  const confirmedCount = daily.filter(isConfirmed).length;
+  const confirmedCount = filtered.filter(isConfirmed).length;
 
   const handleConfirm = (id: string, values: { actualQty: number; ratePerLiter: number; fatContent?: number; snf?: number; notes?: string }) => {
     setConfirmingId(id);
@@ -224,15 +225,32 @@ export default function MilkCollectionsPage() {
   const headerAction = React.useMemo(
     () =>
       tab === 'daily' ? (
-        <Button className="min-h-11" loading={generate.isPending} onClick={() => generate.mutate(date)}>
-          Generate day
-        </Button>
+        <div className="flex items-center gap-2">
+          {pending.length > 0 && (
+            <Button
+              variant="outline"
+              className="min-h-11"
+              loading={bulkConfirm.isPending}
+              onClick={() =>
+                bulkConfirm.mutate({
+                  date,
+                  session: session as 'morning' | 'evening' | 'both',
+                })
+              }
+            >
+              Confirm all ({pending.length})
+            </Button>
+          )}
+          <Button className="min-h-11" loading={generate.isPending} onClick={() => generate.mutate(date)}>
+            Generate day
+          </Button>
+        </div>
       ) : (
         <Button variant="outline" className="min-h-11" onClick={exportHistoryCsv}>
           Export CSV
         </Button>
       ),
-    [tab, generate, date, exportHistoryCsv],
+    [tab, generate, bulkConfirm, daily, pending, date, session, exportHistoryCsv],
   );
   useRegisterHeaderAction(headerAction);
 
@@ -254,7 +272,17 @@ export default function MilkCollectionsPage() {
           )}
           {(missingQuery.data ?? []).length > 0 && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              Missing collections on: {(missingQuery.data ?? []).join(', ')}
+              <p className="font-semibold">
+                Missing collections: {(missingQuery.data ?? []).length} supplier
+                {missingQuery.data && missingQuery.data.length !== 1 ? 's' : ''} found
+              </p>
+              <ul className="mt-1 list-inside list-disc pl-4">
+                {(missingQuery.data ?? []).map((m: MissingCollection) => (
+                  <li key={`${m.supplierId}-${m.date}-${m.session}`}>
+                    {formatDate(m.date)} · <span className="capitalize">{m.session}</span> · {m.supplierName}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -280,12 +308,12 @@ export default function MilkCollectionsPage() {
           <Card>
             <CardContent className="flex items-center justify-between gap-2 pt-4">
               <p className="text-sm text-slate-600">
-                Confirmed {confirmedCount}/{daily.length}
+                Confirmed {confirmedCount}/{filtered.length}
               </p>
               <div className="h-2 w-40 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${daily.length > 0 ? Math.round((confirmedCount / daily.length) * 100) : 0}%` }}
+                  style={{ width: `${filtered.length > 0 ? Math.round((confirmedCount / filtered.length) * 100) : 0}%` }}
                 />
               </div>
             </CardContent>

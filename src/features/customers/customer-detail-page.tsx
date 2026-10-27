@@ -42,7 +42,7 @@ import { useCustomer, useUpdateCustomer } from './hooks';
 import { customersApi } from './api';
 import { CustomerForm } from './components/customer-form';
 import type { AreaOption } from './components/customer-form';
-import { customerBalance } from './components/customer-table';
+import { customerBalance } from '../customer-utils';
 import { CustomerOrdersTab } from './components/customer-orders-tab';
 import { CustomerSubscriptionsTab } from './components/customer-subscriptions-tab';
 import { AdjustBalanceDialog, CollectPaymentDialog, CustomerPaymentsTab } from './components/customer-payments-tab';
@@ -319,17 +319,11 @@ export default function CustomerDetailPage() {
   }
 
   const balance = customerBalance(customer);
-  const areaLabel = customer.deliveryConfig?.assignedAreaName ?? customer.areaName;
+  const areaLabel =
+    customer.deliveryConfig?.assignedAreaName ??
+    customer.areaName ??
+    areas.find((a) => a.id === (customer.deliveryConfig?.assignedArea ?? customer.areaId))?.name;
   const addresses = customer.addresses ?? [];
-  const primaryAddress = addresses[0];
-  const addressStr = [
-    primaryAddress?.line1 ?? primaryAddress?.street,
-    primaryAddress?.line2,
-    primaryAddress?.city,
-    primaryAddress?.pincode,
-  ]
-    .filter(Boolean)
-    .join(', ');
   const deliverySequence = customer.deliveryConfig?.deliverySequence;
   const deliverySlot = customer.deliveryConfig?.slot;
   const mapAddress = addresses.find((a) => a.lat != null && a.lng != null);
@@ -518,8 +512,17 @@ export default function CustomerDetailPage() {
                 name: customer.name,
                 email: customer.email ?? '',
                 phone: customer.phone ?? '',
-                role: (customer.role as 'customer' | 'agent' | 'admin') ?? 'customer',
+                role: customer.role,
                 isActive: customer.isActive,
+                address: {
+                  street: customer.addresses?.[0]?.street ?? customer.addresses?.[0]?.line1 ?? '',
+                  city: customer.addresses?.[0]?.city ?? '',
+                  pincode: customer.addresses?.[0]?.pincode ?? '',
+                },
+                deliveryConfig: {
+                  assignedArea: customer.deliveryConfig?.assignedArea ?? '',
+                  deliverySequence: customer.deliveryConfig?.deliverySequence ?? undefined,
+                },
               }}
               onSubmit={handleEdit}
             />

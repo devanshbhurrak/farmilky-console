@@ -1,5 +1,13 @@
 import { api } from '@/lib/api-client';
-import type { MilkCollection, Supplier } from '@/types/supplier';
+import type {
+  ConfirmResult,
+  GenerateSummary,
+  MissingCollection,
+  MilkCollection,
+  Supplier,
+  TodayShiftSummary,
+  UpdateResult,
+} from '@/types/supplier';
 import { normalizeList, unwrapData } from '@/lib/utils';
 
 export interface CollectionHistoryParams {
@@ -20,12 +28,17 @@ export interface ConfirmCollectionInput {
 }
 
 export interface UpdateCollectionInput {
-  void_reason?: string;
   actualQty?: number;
   ratePerLiter?: number;
   fatContent?: number | null;
   snf?: number | null;
   notes?: string | null;
+}
+
+export interface BulkConfirmInput {
+  date: string;
+  ratePerLiter?: number;
+  session: 'morning' | 'evening' | 'both';
 }
 
 export const milkApi = {
@@ -34,20 +47,19 @@ export const milkApi = {
     const { items } = normalizeList<MilkCollection>(res, ['collections']);
     return items;
   },
-  generate: async (date: string): Promise<MilkCollection[]> => {
+  generate: async (date: string): Promise<GenerateSummary> => {
     const res = await api.post<unknown>('/api/milk-collections/generate', { date });
-    const { items } = normalizeList<MilkCollection>(res, ['collections']);
-    return items;
+    return unwrapData<GenerateSummary>(res as { success?: boolean; data?: GenerateSummary });
   },
-  missing: async (from: string, to: string): Promise<string[]> => {
+  missing: async (from: string, to: string): Promise<MissingCollection[]> => {
     try {
       const res = await api.get<unknown>('/api/milk-collections/missing', { startDate: from, endDate: to });
       const unwrapped = unwrapData<unknown>(res as { success?: boolean; data?: unknown });
-      if (Array.isArray(unwrapped)) return unwrapped.map((d) => String(d));
+      if (Array.isArray(unwrapped)) return unwrapped as MissingCollection[];
       if (unwrapped && typeof unwrapped === 'object') {
         const obj = unwrapped as Record<string, unknown>;
-        for (const key of ['missing', 'dates', 'days', 'data']) {
-          if (Array.isArray(obj[key])) return (obj[key] as unknown[]).map((d) => String(d));
+        for (const key of ['missing', 'dates', 'days', 'data', 'items']) {
+          if (Array.isArray(obj[key])) return obj[key] as MissingCollection[];
         }
       }
       return [];
@@ -55,16 +67,19 @@ export const milkApi = {
       return [];
     }
   },
-  confirm: async (id: string, data: ConfirmCollectionInput): Promise<MilkCollection> => {
+  confirm: async (id: string, data: ConfirmCollectionInput): Promise<ConfirmResult> => {
     const res = await api.post<unknown>(`/api/milk-collections/${id}/confirm`, data);
-    return unwrapData<MilkCollection>(res as { success?: boolean; data?: MilkCollection });
+    return unwrapData<ConfirmResult>(res as { success?: boolean; data?: ConfirmResult });
   },
-  update: async (id: string, data: UpdateCollectionInput): Promise<MilkCollection> => {
-    const res = await api.put<unknown>(`/api/milk-collections/${id}`, {
-      ...data,
-      void_reason: data.void_reason || 'Admin edit',
-    });
-    return unwrapData<MilkCollection>(res as { success?: boolean; data?: MilkCollection });
+  update: async (id: string, data: UpdateCollectionInput): Promise<UpdateResult> => {
+    const res = await api.put<unknown>(`/api/milk-collections/${id}`, data);
+    return unwrapData<UpdateResult>(res as { success?: boolean; data?: UpdateResult });
+  },
+  bulkConfirm: async (input: BulkConfirmInput): Promise<{ confirmed: number; skipped: number; date: string }> => {
+    const res = await api.post<unknown>('/api/milk-collections/bulk-confirm', input);
+    return unwrapData<{ confirmed: number; skipped: number; date: string }>(
+      res as { success?: boolean; data?: { confirmed: number; skipped: number; date: string } },
+    );
   },
   history: async (params: CollectionHistoryParams): Promise<{ items: MilkCollection[]; meta: { total: number; page: number; limit: number; totalPages: number } }> => {
     const res = await api.get<unknown>('/api/milk-collections', {
@@ -83,9 +98,8 @@ export const milkApi = {
     const { items } = normalizeList<Supplier>(res, ['suppliers']);
     return items;
   },
-  todayShift: async (): Promise<MilkCollection[]> => {
+  todayShift: async (): Promise<TodayShiftSummary> => {
     const res = await api.get<unknown>('/api/milk-collections/today-shift');
-    const { items } = normalizeList<MilkCollection>(res, ['collections']);
-    return items;
+    return unwrapData<TodayShiftSummary>(res as { success?: boolean; data?: TodayShiftSummary });
   },
 };

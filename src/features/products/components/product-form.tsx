@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import * as React from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField, FormSection } from '@/components/form/form-field';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@/types/product';
-import { titleCase } from '@/lib/utils';
+import { getImageUrl, titleCase } from '@/lib/utils';
 import { productSchema, type ProductInput } from '../schemas';
 import { productsApi } from '../api';
 
@@ -46,8 +46,8 @@ function ImageUpload({
   onFileSelect: (file: File | null) => void;
   error?: string;
 }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = React.useState<string | null>(null);
+  const [uploading] = React.useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,7 +126,7 @@ function ImageUpload({
         {(preview || value) && (
           <div className="mt-4 rounded-lg overflow-hidden border border-slate-200">
             <img
-              src={preview ?? value!}
+              src={preview ?? getImageUrl(value)}
               alt="Product preview"
               className="w-32 h-32 object-cover"
             />
@@ -160,7 +160,7 @@ export function ProductForm({ defaultValues, onSubmit, submitting }: ProductForm
   } = form;
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
   const setDefaultVariant = (index: number) => {
     const current = getValues('variants');
@@ -177,7 +177,7 @@ export function ProductForm({ defaultValues, onSubmit, submitting }: ProductForm
       const formData = new FormData();
       formData.append('image', selectedFile);
       const uploaded = await productsApi.uploadImage(formData);
-      finalImageUrl = uploaded.url;
+      finalImageUrl = uploaded.data?.url ?? null;
     }
 
     await onSubmit({ ...data, imageUrl: finalImageUrl });

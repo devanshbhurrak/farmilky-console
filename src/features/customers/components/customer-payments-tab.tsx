@@ -17,6 +17,7 @@ import type { LedgerEntry, LedgerSummary } from '@/types/customer';
 const collectSchema = z.object({
   amount: z.coerce.number().min(1, 'Amount must be at least ₹1'),
   date: z.string().min(1, 'Date is required'),
+  paymentMethod: z.enum(['cash', 'upi', 'bank_transfer', 'card', 'online', 'COD']).default('cash'),
   transactionId: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -43,19 +44,19 @@ export function CollectPaymentDialog({
   const record = useRecordPayment();
   const form = useForm<CollectValues>({
     resolver: zodResolver(collectSchema) as unknown as Resolver<CollectValues>,
-    defaultValues: { amount: undefined as unknown as number, date: todayLocal(), transactionId: '', notes: '' },
+    defaultValues: { amount: undefined as unknown as number, date: todayLocal(), paymentMethod: 'cash', transactionId: '', notes: '' },
   });
 
   async function submit(values: CollectValues) {
     await record.mutateAsync({
       userId,
       amount: values.amount,
-      type: 'credit',
+      paymentMethod: values.paymentMethod,
       date: values.date,
       transactionId: values.transactionId || undefined,
       notes: values.notes || undefined,
     });
-    form.reset({ amount: undefined as unknown as number, date: todayLocal(), transactionId: '', notes: '' });
+    form.reset({ amount: undefined as unknown as number, date: todayLocal(), paymentMethod: 'cash', transactionId: '', notes: '' });
     onOpenChange(false);
   }
 
@@ -72,6 +73,16 @@ export function CollectPaymentDialog({
             </FormField>
             <FormField label="Date" required error={form.formState.errors.date?.message}>
               <Input type="date" {...form.register('date')} />
+            </FormField>
+            <FormField label="Method" required error={form.formState.errors.paymentMethod?.message}>
+              <Select {...form.register('paymentMethod')}>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="card">Card</option>
+                <option value="online">Online</option>
+                <option value="COD">COD</option>
+              </Select>
             </FormField>
             <FormField label="Transaction ID" error={form.formState.errors.transactionId?.message}>
               <Input placeholder="UPI ref / receipt no." {...form.register('transactionId')} />
@@ -158,27 +169,6 @@ export function AdjustBalanceDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-export function CollectAdjustDialogs({
-  userId,
-  collectOpen,
-  onCollectChange,
-  adjustOpen,
-  onAdjustChange,
-}: {
-  userId: string;
-  collectOpen: boolean;
-  onCollectChange: (open: boolean) => void;
-  adjustOpen: boolean;
-  onAdjustChange: (open: boolean) => void;
-}) {
-  return (
-    <>
-      <CollectPaymentDialog userId={userId} open={collectOpen} onOpenChange={onCollectChange} />
-      <AdjustBalanceDialog userId={userId} open={adjustOpen} onOpenChange={onAdjustChange} />
-    </>
   );
 }
 

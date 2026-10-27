@@ -11,7 +11,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { Resolver, FieldValues } from 'react-hook-form';
 import type { ZodType } from 'zod';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function typedZodResolver<T extends FieldValues>(schema: ZodType<T, any, any>): Resolver<T> {
   return zodResolver(schema) as unknown as Resolver<T>;
 }

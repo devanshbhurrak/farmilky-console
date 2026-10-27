@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/data/status-badge';
 import { formatCurrency, getName, getPhone, titleCase } from '@/lib/utils';
+import { slotConfigOf } from '../api';
 import type { Subscription } from '@/types/subscription';
 
 export function SubscriptionCard({
@@ -27,6 +28,8 @@ export function SubscriptionCard({
       ? (subscription.productId.basePrice ?? subscription.productId.price ?? subscription.pricePerPacket ?? subscription.pricePerUnit)
       : (subscription.pricePerPacket ?? subscription.pricePerUnit);
   const isCustom = Number(subscription.pricePerPacket ?? subscription.pricePerUnit) !== Number(standardRate);
+  const slotConfig = slotConfigOf(subscription);
+  const isMultiSlot = slotConfig.length > 1;
   const slot = subscription.deliverySlot ?? subscription.slot;
 
   return (
@@ -59,7 +62,14 @@ export function SubscriptionCard({
             <span className="font-semibold text-slate-900">{formatCurrency(daily)}</span>
             {isCustom && <Badge variant="warning">CUSTOM</Badge>}
             <span className="text-xs text-slate-500">
-              {titleCase(typeof slot === 'string' ? slot : 'morning')} slot
+              {isMultiSlot
+                ? `${slotConfig
+                    .map(
+                      (s) =>
+                        `${s.quantityPerDelivery} ${s.slot === 'morning' ? 'AM' : 'PM'}`,
+                    )
+                    .join(' · ')} slots`
+                : `${titleCase(typeof slot === 'string' ? slot : 'morning')} slot`}
             </span>
           </span>
         </button>

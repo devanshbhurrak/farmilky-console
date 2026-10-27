@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/data/status-badge';
-import { formatCurrency, titleCase } from '@/lib/utils';
+import { formatCurrency, getImageUrl, titleCase } from '@/lib/utils';
 import type { Product } from '@/types/product';
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product, onClick }: { product: Product; onClick?: () => void }) {
   const variants = product.variants ?? [];
   const featured = variants.find((v) => v.isDefault) ?? variants[0];
   const price = featured
@@ -13,11 +13,17 @@ export function ProductCard({ product }: { product: Product }) {
   const image = product.imageUrl ?? product.image;
 
   return (
-    <Card>
+    <Card
+      className={onClick ? 'cursor-pointer' : undefined}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(); } : undefined}
+    >
       <CardContent className="flex gap-3 p-4">
         {image ? (
           <img
-            src={image}
+            src={getImageUrl(image)}
             alt={product.name}
             loading="lazy"
             className="size-14 shrink-0 rounded-lg object-cover"

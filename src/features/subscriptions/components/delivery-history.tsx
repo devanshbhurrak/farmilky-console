@@ -16,6 +16,7 @@ import { ErrorState } from '@/components/data/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
+import { toast } from 'sonner';
 import { formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
 import type { DeliveryHistoryEntry } from '@/types/subscription';
 import { useDeleteHistoryEntry, useRecordSubscriptionOutcome, useSubscriptionHistory } from '../hooks';
@@ -42,10 +43,15 @@ function shift(month: number, year: number, delta: number): { month: number; yea
 export function DeliveryHistory({
   subscriptionId,
   startMonth,
+  slots,
 }: {
   subscriptionId: string;
   startMonth?: string;
+  // Per-slot config; when multiple slots are configured the outcome form
+  // requires picking which slot the outcome applies to (backend requirement).
+  slots?: Array<{ slot: 'morning' | 'evening'; quantityPerDelivery: number }>; 
 }) {
+  const isMultiSlot = (slots?.length ?? 0) > 1;
   const now = new Date();
   const currentKey = toKey(now.getMonth() + 1, now.getFullYear());
   const minKey = (startMonth ?? '').slice(0, 7) || '2000-01';
@@ -83,7 +89,14 @@ export function DeliveryHistory({
 
   const openAdd = () => {
     setEditing(null);
-    form.reset({ deliveryDate: '', status: 'delivered', actualQuantity: undefined, reason: '', notes: '' });
+    form.reset({
+      deliveryDate: '',
+      slot: slots?.[0]?.slot,
+      status: 'delivered',
+      actualQuantity: undefined,
+      reason: '',
+      notes: '',
+    });
     setSheetOpen(true);
   };
 
@@ -91,6 +104,9 @@ export function DeliveryHistory({
     setEditing(entry);
     form.reset({
       deliveryDate: entry.deliveryDate.slice(0, 10),
+      slot:
+        ((entry.deliverySlot ?? entry.slot) as 'morning' | 'evening' | undefined) ??
+        slots?.[0]?.slot,
       status: (entry.status as SubscriptionOutcomeInput['status']) ?? 'delivered',
       actualQuantity: entry.actualQuantity ?? entry.quantity,
       reason: entry.reason ?? '',
@@ -100,6 +116,11 @@ export function DeliveryHistory({
   };
 
   const onSubmit = (values: SubscriptionOutcomeInput) => {
+    // The backend rejects outcomes without a slot for multi-slot subscriptions.
+    if (isMultiSlot && !values.slot) {
+      toast.error('Select which slot this outcome applies to');
+      return;
+    }
     recordOutcome.mutate(
       { id: subscriptionId, data: values },
       {
@@ -161,6 +182,11 @@ export function DeliveryHistory({
                     <StatusBadge status={e.status} />
                   </div>
                   <div className="mt-1 text-slate-600">
+                    {isMultiSlot && (e.deliverySlot ?? e.slot) != null && (
+                      <>
+                        {(e.deliverySlot ?? e.slot) === 'evening' ? 'Evening' : 'Morning'} ·{' '}
+                      </>
+                    )}
                     Qty {e.actualQuantity ?? e.quantity ?? '—'}
                     {e.rate != null && ` · Rate ${formatCurrency(e.rate)}`}
                     {e.amount != null && ` · ${formatCurrency(e.amount)}`}
@@ -182,6 +208,9 @@ export function DeliveryHistory({
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase">Date</th>
+                    {isMultiSlot && (
+                      <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase">Slot</th>
+                    )}
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase">Status</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase">Qty</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase">Rate</th>
@@ -194,6 +223,15 @@ export function DeliveryHistory({
                   {items.map((e) => (
                     <tr key={getId(e)} className="border-b border-slate-100 last:border-0">
                       <td className="px-4 py-3">{formatDate(e.deliveryDate)}</td>
+                      {isMultiSlot && (
+                        <td className="px-4 py-3">
+                          {(e.deliverySlot ?? e.slot) != null
+                            ? (e.deliverySlot ?? e.slot) === 'evening'
+                              ? 'Evening'
+                              : 'Morning'
+                            : '—'}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <StatusBadge status={e.status} />
                       </td>
@@ -229,6 +267,18 @@ export function DeliveryHistory({
             <FormField label="Delivery date" required error={form.formState.errors.deliveryDate?.message}>
               <Input type="date" {...form.register('deliveryDate')} />
             </FormField>
+            {isMultiSlot && (
+              <FormField label="Slot" required error={form.formState.errors.slot?.message}>
+                <Select {...form.register('slot')}>
+                  <option value="">Select slot</option>
+                  {slots?.map((s) => (
+                    <option key={s.slot} value={s.slot}>
+                      {s.slot === 'morning' ? 'Morning' : 'Evening'}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
             <FormField label="Status" required error={form.formState.errors.status?.message}>
               <Select {...form.register('status')}>
                 <option value="delivered">Delivered</option>

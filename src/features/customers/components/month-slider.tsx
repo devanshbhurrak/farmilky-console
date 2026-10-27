@@ -39,10 +39,6 @@ export function MonthSlider({
     };
   }, [open]);
 
-  React.useEffect(() => {
-    if (open) setPickerYear(year);
-  }, [open, year]);
-
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
@@ -73,7 +69,10 @@ export function MonthSlider({
 
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            if (!open) setPickerYear(year);
+            setOpen((o) => !o);
+          }}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={`Selected period ${MONTHS_LONG[month - 1]} ${year}. Open month and year picker`}

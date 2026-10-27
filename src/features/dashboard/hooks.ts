@@ -2,16 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from './api';
 import { queryKeys } from '@/lib/query-keys';
 import { normalizeList, unwrapData } from '@/lib/utils';
-import type { MilkCollection } from '@/types/supplier';
+import type { TodayShiftSummary } from '@/types/supplier';
 import type { SupplyRow } from './types';
 
 const STALE = 60_000;
-
-function rowsOf(res: unknown, keys: string[]): { items: { [k: string]: unknown }[] } {
-  if (!res) return { items: [] };
-  const { items } = normalizeList<{ [k: string]: unknown }>(res, keys);
-  return { items };
-}
 
 // Unwrap the { data, error } envelope: a failed fetch becomes a thrown error
 // so React Query exposes it via isError/error instead of rendering blank
@@ -58,12 +52,12 @@ export function useProfitStats() {
 }
 
 export function useTodayShift() {
-  return useQuery({
+  return useQuery<TodayShiftSummary | null>({
     queryKey: queryKeys.milkCollections.todayShift(),
-    queryFn: async (): Promise<MilkCollection[]> => {
+    queryFn: async () => {
       const res = unwrapOrThrow(await dashboardApi.todayShift());
-      if (!res) return [];
-      return rowsOf(res, ['collections']).items as unknown as MilkCollection[];
+      if (!res) return null;
+      return unwrapData<TodayShiftSummary>(res as { success?: boolean; data?: TodayShiftSummary });
     },
     staleTime: STALE,
   });

@@ -37,6 +37,7 @@ export interface ProductListParams {
   availability?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  slug?: string; // tenant slug for unauthenticated public requests
 }
 
 export const PRODUCT_CATEGORIES = ['milk', 'ghee', 'paneer', 'curd', 'butter', 'cheese', 'other'] as const;

@@ -16,7 +16,7 @@ import { useRegisterHeaderAction } from '@/components/layout/header-action-conte
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, getId, titleCase } from '@/lib/utils';
+import { formatCurrency, getId, getImageUrl, titleCase } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS, type Product, type ProductListParams } from '@/types/product';
 import { useCreateProduct, useDeleteProduct, useProducts, useUpdateProduct } from './hooks';
 import type { ProductInput } from './schemas';
@@ -139,7 +139,7 @@ export default function ProductsPage() {
         <div className="flex items-center gap-3">
           {(p.imageUrl ?? p.image) ? (
             <img
-              src={p.imageUrl ?? p.image ?? ''}
+              src={getImageUrl(p.imageUrl ?? p.image)}
               alt={p.name}
               loading="lazy"
               className="size-10 shrink-0 rounded-lg object-cover"
@@ -315,7 +315,9 @@ export default function ProductsPage() {
         emptyIcon={<Package className="size-6" />}
         emptyActionLabel={isAdmin ? 'Add product' : undefined}
         onEmptyAction={isAdmin ? openCreate : undefined}
-        renderCard={(p) => <ProductCard product={p} />}
+        renderCard={(p) => (
+          <ProductCard product={p} onClick={isAdmin ? () => openEdit(p) : undefined} />
+        )}
         page={meta.page}
         totalPages={meta.totalPages}
         total={meta.total}

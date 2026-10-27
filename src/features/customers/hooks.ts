@@ -77,14 +77,6 @@ export function useCustomerOrders(userId: string | undefined) {
   });
 }
 
-export function useCustomerPassbook(userId: string | undefined, opts?: { month?: number; year?: number }) {
-  return useQuery({
-    queryKey: [...queryKeys.payments.passbook(userId ?? ''), { month: opts?.month, year: opts?.year }],
-    queryFn: () => customersApi.passbook(userId as string, { month: opts?.month, year: opts?.year }),
-    enabled: !!userId,
-  });
-}
-
 /**
  * Month ledger with totals. Keyed by period and deliberately not using
  * placeholder data so switching months never shows the previous month's rows.

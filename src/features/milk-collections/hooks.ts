@@ -1,7 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { milkApi } from './api';
-import type { CollectionHistoryParams, ConfirmCollectionInput, UpdateCollectionInput } from './api';
+import type { BulkConfirmInput, CollectionHistoryParams, ConfirmCollectionInput, UpdateCollectionInput } from './api';
+import type { TodayShiftSummary } from '@/types/supplier';
 import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage } from '@/lib/utils';
 
@@ -18,10 +19,10 @@ export function useGenerateDaily() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (date: string) => milkApi.generate(date),
-    onSuccess: (_data, date) => {
+    onSuccess: (data, date) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.milkCollections.daily(date) });
       queryClient.invalidateQueries({ queryKey: queryKeys.milkCollections.all() });
-      toast.success('Daily collections generated');
+      toast.success(`Daily collections generated (${data.created} created, ${data.skipped} skipped)`);
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -51,6 +52,18 @@ export function useUpdateCollection() {
   });
 }
 
+export function useBulkConfirm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkConfirmInput) => milkApi.bulkConfirm(input),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.milkCollections.all() });
+      toast.success(`Bulk confirm: ${data.confirmed} confirmed, ${data.skipped} skipped`);
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
 export function useCollectionHistory(params: CollectionHistoryParams) {
   return useQuery({
     queryKey: queryKeys.milkCollections.history(params),
@@ -60,7 +73,7 @@ export function useCollectionHistory(params: CollectionHistoryParams) {
 }
 
 export function useTodayShift() {
-  return useQuery({
+  return useQuery<TodayShiftSummary>({
     queryKey: queryKeys.milkCollections.todayShift(),
     queryFn: () => milkApi.todayShift(),
     staleTime: 60_000,

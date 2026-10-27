@@ -25,6 +25,32 @@ export interface SubscriptionDetail extends Subscription {
   deliveredCount?: number | null;
 }
 
+export interface SubscriptionSlotInput {
+  slot: 'morning' | 'evening';
+  quantityPerDelivery?: number;
+}
+
+// Slot rows (per-slot quantities) are attached by the backend detail endpoint
+// as `slots` on the subscription. Falls back to the legacy single-slot fields
+// when no rows exist.
+export function slotConfigOf(sub: {
+  slots?: unknown;
+  deliverySlot?: string;
+  quantityPerDelivery?: number | string;
+}): Array<{ slot: 'morning' | 'evening'; quantityPerDelivery: number }> {
+  const rows = Array.isArray(sub.slots)
+    ? (sub.slots as Array<{ deliverySlot?: string; quantityPerDelivery?: string | number }>)
+    : [];
+  if (rows.length > 0) {
+    return rows.map((r) => ({
+      slot: r.deliverySlot === 'evening' ? 'evening' : 'morning',
+      quantityPerDelivery: Number(r.quantityPerDelivery ?? 0),
+    }));
+  }
+  const primary = sub.deliverySlot === 'evening' ? 'evening' : 'morning';
+  return [{ slot: primary, quantityPerDelivery: Number(sub.quantityPerDelivery ?? 1) }];
+}
+
 export interface CreateSubscriptionRequest {
   userId: string;
   productId: string;
@@ -35,9 +61,30 @@ export interface CreateSubscriptionRequest {
   deliverySchedule: 'daily' | 'alternate' | 'weekly' | 'custom';
   customDays?: string[];
   deliverySlot?: 'morning' | 'evening';
+  // Multi-slot config; takes precedence over deliverySlot when present.
+  deliverySlots?: SubscriptionSlotInput[];
+  // Form shape (from SubscriptionInput): selected slots + per-slot quantities.
+  slots?: string[];
+  slotQuantities?: { morning?: number; evening?: number };
   quantityPerDay?: number;
   pricePerUnit?: number;
   slot?: 'morning' | 'evening';
+}
+
+// Convert the form's `slots` + `slotQuantities` shape into the backend's
+// `deliverySlots` array. Returns undefined when the request carries no
+// multi-slot info, so legacy callers keep their old payloads.
+function toDeliverySlots(
+  data: Pick<CreateSubscriptionRequest, 'slots' | 'slotQuantities' | 'deliverySlots'>,
+): SubscriptionSlotInput[] | undefined {
+  if (data.deliverySlots && data.deliverySlots.length > 0) return data.deliverySlots;
+  if (!data.slots || data.slots.length === 0) return undefined;
+  return data.slots
+    .filter((s): s is 'morning' | 'evening' => s === 'morning' || s === 'evening')
+    .map((slot) => ({
+      slot,
+      quantityPerDelivery: data.slotQuantities?.[slot],
+    }));
 }
 
 export interface ScheduleChangeRequest {
@@ -51,6 +98,8 @@ export interface ScheduleChangeRequest {
 
 export interface SubscriptionOutcomeRequest {
   deliveryDate: string;
+  // Required for multi-slot subscriptions.
+  slot?: 'morning' | 'evening';
   status: 'delivered' | 'partial' | 'extra' | 'failed' | 'skipped';
   actualQuantity?: number;
   reason?: string;
@@ -77,15 +126,20 @@ export const subscriptionsApi = {
   get: (id: string) => api.get<ApiResponse<SubscriptionDetail>>(`/api/subscriptions/admin/${id}`),
   create: (data: CreateSubscriptionRequest) => {
     const customPrice = data.customPrice ?? data.pricePerUnit;
+    // Backend accepts an optional `deliverySlots` array (per-slot quantities);
+    // when present it takes precedence over the single `deliverySlot`.
+    const deliverySlots = toDeliverySlots(data);
     const payload = {
       userId: data.userId,
       productId: data.productId,
       variantId: data.variantId,
+      quantityPerDelivery: data.quantityPerDelivery,
       customPrice: customPrice && customPrice > 0 ? customPrice : undefined,
       startDate: data.startDate,
       deliverySchedule: data.deliverySchedule,
       customDays: data.customDays ?? [],
-      deliverySlot: data.deliverySlot ?? data.slot ?? 'morning',
+      deliverySlot: deliverySlots?.[0]?.slot ?? data.deliverySlot ?? data.slot ?? 'morning',
+      ...(deliverySlots ? { deliverySlots } : {}),
     };
     return api.post<ApiResponse<Subscription>>('/api/subscriptions/admin/create', payload, { idempotent: true });
   },
@@ -93,7 +147,12 @@ export const subscriptionsApi = {
     const payload: Record<string, unknown> = {};
     if (data.productId !== undefined) payload.productId = data.productId;
     if (data.variantId !== undefined) payload.variantId = data.variantId;
-    if (data.quantityPerDelivery !== undefined || data.quantityPerDay !== undefined) {
+    // Multi-slot subscriptions must update quantities per slot; the backend
+    // rejects a plain quantityPerDelivery for them.
+    const deliverySlots = toDeliverySlots(data);
+    if (deliverySlots && deliverySlots.length > 0) {
+      payload.deliverySlots = deliverySlots;
+    } else if (data.quantityPerDelivery !== undefined || data.quantityPerDay !== undefined) {
       payload.quantityPerDelivery = data.quantityPerDelivery ?? data.quantityPerDay;
     }
     if (data.deliverySlot !== undefined || data.slot !== undefined) {
@@ -120,6 +179,8 @@ export const subscriptionsApi = {
     const qty = data.scheduledQty ?? data.quantityPerDay;
     if (qty !== undefined) payload.scheduledQty = qty;
     if (data.scheduledPrice !== undefined) payload.scheduledPrice = data.scheduledPrice;
+    // Multi-slot subscriptions require a target slot for scheduledQty.
+    if (data.slot !== undefined) payload.slot = data.slot;
     return api.put<ApiResponse<Subscription>>(`/api/subscriptions/admin/${id}/schedule-change`, payload);
   },
   cancelScheduleChange: (id: string) =>

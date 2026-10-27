@@ -8,6 +8,7 @@ import { FormField } from '@/components/form/form-field';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { formatDate, titleCase } from '@/lib/utils';
 import { useCancelScheduleChange, useScheduleChange } from '../hooks';
+import { slotConfigOf } from '../api';
 import type { SubscriptionDetail } from '../api';
 
 export function ScheduleConfig({ subscription }: { subscription: SubscriptionDetail }) {
@@ -16,6 +17,9 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
   const [newQty, setNewQty] = useState<string>('1');
   const [newSlot, setNewSlot] = useState('morning');
   const [confirmCancel, setConfirmCancel] = useState(false);
+
+  const slotConfig = slotConfigOf(subscription);
+  const isMultiSlot = slotConfig.length > 1;
 
   const scheduleChange = useScheduleChange();
   const cancelChange = useCancelScheduleChange();
@@ -35,6 +39,9 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
         effectiveDate,
         deliverySchedule: newSchedule,
         scheduledQty: Number(newQty) || undefined,
+        // The backend requires a target slot for scheduledQty on multi-slot
+        // subscriptions.
+        slot: isMultiSlot ? newSlot : undefined,
       },
     });
   };
@@ -49,7 +56,14 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
           <span className="text-slate-600">Current:</span>
           <Badge variant="info">{titleCase(subscription.deliverySchedule)}</Badge>
           <span className="text-slate-600">
-            {subscription.quantityPerDelivery ?? subscription.quantityPerDay}/delivery · {titleCase(typeof (subscription.deliverySlot ?? subscription.slot) === 'string' ? (subscription.deliverySlot ?? subscription.slot) as string : '')}
+            {isMultiSlot
+              ? slotConfig
+                  .map(
+                    (s) =>
+                      `${s.quantityPerDelivery} ${s.slot === 'morning' ? 'AM' : 'PM'}`,
+                  )
+                  .join(' · ')
+              : `${subscription.quantityPerDelivery ?? subscription.quantityPerDay}/delivery · ${titleCase(typeof (subscription.deliverySlot ?? subscription.slot) === 'string' ? (subscription.deliverySlot ?? subscription.slot) as string : '')}`}
           </span>
         </div>
 
@@ -79,9 +93,20 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
               <option value="custom">Custom</option>
             </Select>
           </FormField>
-          <FormField label="New qty / delivery">
+          <FormField label={isMultiSlot ? 'New qty' : 'New qty / delivery'}>
             <Input type="number" min={1} value={newQty} onChange={(e) => setNewQty(e.target.value)} />
           </FormField>
+          {isMultiSlot && (
+            <FormField label="Target slot" required>
+              <Select value={newSlot} onChange={(e) => setNewSlot(e.target.value)}>
+                {slotConfig.map((s) => (
+                  <option key={s.slot} value={s.slot}>
+                    {s.slot === 'morning' ? 'Morning' : 'Evening'}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          )}
         </div>
         <Button onClick={submit} disabled={!effectiveDate} loading={scheduleChange.isPending} className="min-h-11 self-start">
           Schedule future change
