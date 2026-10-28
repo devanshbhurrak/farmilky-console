@@ -6,7 +6,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 
 export default [
-  { ignores: ['dist', '*.config.js', '*.config.ts'] },
+  { ignores: ['dist', '.wrangler-dist/**', '*.config.js', '*.config.ts'] },
   {
     // JS/JSX files
     files: ['**/*.{js,jsx}'],

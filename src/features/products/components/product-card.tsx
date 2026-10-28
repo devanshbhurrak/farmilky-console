@@ -1,10 +1,20 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/data/status-badge';
 import { formatCurrency, getImageUrl, titleCase } from '@/lib/utils';
 import type { Product } from '@/types/product';
+import { Trash2 } from 'lucide-react';
 
-export function ProductCard({ product, onClick }: { product: Product; onClick?: () => void }) {
+export function ProductCard({
+  product,
+  onClick,
+  onDelete,
+}: {
+  product: Product;
+  onClick?: () => void;
+  onDelete?: () => void;
+}) {
   const variants = product.variants ?? [];
   const featured = variants.find((v) => v.isDefault) ?? variants[0];
   const price = featured
@@ -52,6 +62,21 @@ export function ProductCard({ product, onClick }: { product: Product; onClick?: 
             {variants.length} variant{variants.length === 1 ? '' : 's'}
           </p>
         </div>
+        {onDelete && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label={`Delete ${product.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <Trash2 aria-hidden />
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

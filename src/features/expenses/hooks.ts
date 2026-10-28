@@ -1,6 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { expensesApi, type ExpenseSummary, type ExpenseSummaryParams } from './api';
+import {
+  expensesApi,
+  type ExpenseApiRecord,
+  type ExpenseSummary,
+  type ExpenseSummaryParams,
+} from './api';
 import type { ExpenseInput } from './schemas';
 import type { Expense, ExpenseListParams } from '@/types/expense';
 import { queryKeys } from '@/lib/query-keys';
@@ -36,7 +41,22 @@ function parseSummary(response: unknown): ExpenseSummary {
 export function useExpenses(params: ExpenseListParams) {
   return useQuery({
     queryKey: queryKeys.expenses.list(params),
-    queryFn: async () => normalizeList<Expense>(await expensesApi.list(params)),
+    queryFn: async () => {
+      const list = normalizeList<ExpenseApiRecord>(await expensesApi.list(params));
+      return {
+        ...list,
+        items: list.items.map((row) => ({
+          id: row.id,
+          amount: Number(row.amount),
+          category: row.txnCategory ?? row.category ?? 'miscellaneous',
+          date: row.effectiveDate ?? row.date ?? '',
+          description: row.description ?? null,
+          paymentMethod: row.paymentMethod ?? null,
+          receiptReference: row.receiptReference ?? row.paymentRef ?? null,
+          createdAt: row.createdAt,
+        })),
+      };
+    },
     placeholderData: keepPreviousData,
   });
 }

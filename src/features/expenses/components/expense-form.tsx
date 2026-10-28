@@ -48,8 +48,8 @@ export function ExpenseForm({ defaultValues, onSubmit, submitting }: ExpenseForm
           ))}
         </Select>
       </FormField>
-      <FormField label="Description" error={form.formState.errors.description?.message}>
-        <Textarea placeholder="What was this expense for? (optional)" {...form.register('description')} />
+      <FormField label="Description" required error={form.formState.errors.description?.message}>
+        <Textarea placeholder="What was this expense for?" {...form.register('description')} />
       </FormField>
       <FormField label="Payment method" error={form.formState.errors.paymentMethod?.message}>
         <Select {...form.register('paymentMethod')}>

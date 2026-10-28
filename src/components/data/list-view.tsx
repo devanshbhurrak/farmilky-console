@@ -46,6 +46,7 @@ export interface ListViewConfig<T> {
   total?: number;
   onPageChange?: (page: number) => void;
   className?: string;
+  children?: React.ReactNode;
 }
 
 function getActiveFilters(
@@ -192,25 +193,30 @@ export function ListView<T>({
   total,
   onPageChange,
   className,
+  children,
 }: ListViewConfig<T>) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false);
 
   useRegisterHeaderAction(createAction ?? null);
 
-  const filterDrawer = filterConfig
-    ? useFilterDrawer(filterConfig.initialValues)
-    : { open: false, setOpen: () => {}, draft: {}, setDraft: () => {}, setField: () => {}, openDrawer: () => {} };
+  const filterDrawer = useFilterDrawer(filterConfig?.initialValues ?? {});
 
-  const currentFilters = filterConfig ? filterDrawer.draft : {};
   const initialFilters = filterConfig ? filterConfig.initialValues : {};
+  const currentFilters = filterConfig
+    ? Object.fromEntries(
+        Object.entries(initialFilters).map(([key, value]) => [
+          key,
+          searchParams.get(key) ?? value,
+        ]),
+      )
+    : {};
   const activeFilters = getActiveFilters(currentFilters, initialFilters);
 
   const handleSearchChange = (value: string) => {
     if (onSearchChange) {
       onSearchChange(value);
     }
-    if (filterConfig) {
+    else if (filterConfig) {
       updateUrlParams(setSearchParams, { search: value, page: '1' }, searchParams);
     }
   };
@@ -227,6 +233,11 @@ export function ListView<T>({
     if (filterConfig) {
       filterDrawer.setDraft(filterConfig.initialValues);
     }
+  };
+
+  const openFilterDrawer = () => {
+    filterDrawer.setDraft(currentFilters);
+    filterDrawer.setOpen(true);
   };
 
   const handleFilterRemove = (key: string) => {
@@ -249,7 +260,7 @@ export function ListView<T>({
     }
   };
 
-  const headerActions = React.useMemo(() => {
+  const headerActions = (() => {
     const actions: React.ReactNode[] = [];
     if (createAction) {
       actions.push(createAction);
@@ -259,12 +270,12 @@ export function ListView<T>({
         <FilterButton
           key="filter-btn"
           activeCount={activeFilters.length}
-          onClick={filterDrawer.openDrawer}
+          onClick={openFilterDrawer}
         />
       );
     }
     return actions.length > 0 ? <div className="flex items-center gap-2">{actions}</div> : null;
-  }, [createAction, filterConfig, activeFilters.length, filterDrawer]);
+  })();
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
@@ -287,14 +298,13 @@ export function ListView<T>({
               {Object.entries(filterConfig.fields).map(([key, field]) => (
                 <FilterField
                   key={key}
-                  name={key}
                   label={field.label}
                   type={field.type}
                   value={currentFilters[key] || initialFilters[key] || 'all'}
                   options={field.options}
                   placeholder={field.placeholder}
                   onChange={(value) => {
-                    filterDrawer.setField(key as keyof ListViewFilters, value);
+                    updateUrlParams(setSearchParams, { [key]: value, page: '1' }, searchParams);
                   }}
                 />
               ))}
@@ -324,7 +334,6 @@ export function ListView<T>({
               {Object.entries(filterConfig.fields).map(([key, field]) => (
                 <FilterField
                   key={key}
-                  name={key}
                   label={field.label}
                   type={field.type}
                   value={filterDrawer.draft[key] || initialFilters[key] || 'all'}
@@ -357,6 +366,7 @@ export function ListView<T>({
         total={total}
         onPageChange={onPageChange}
       />
+      {children}
     </div>
   );
 }

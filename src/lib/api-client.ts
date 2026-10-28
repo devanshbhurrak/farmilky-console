@@ -1,14 +1,14 @@
-// VITE_API_BASE_URL is required in production — fail loudly at startup instead
-// of silently issuing same-origin requests that 404. Local dev falls back to
-// the default backend port.
-export const API_BASE: string =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+// In production the SPA is served by the same Worker that proxies /api/* to
+// the backend service binding, so requests are same-origin (empty base).
+// Local dev falls back to the backend port unless VITE_API_BASE_URL is set.
+const configuredBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/$/, '');
+// A localhost value from the developer's .env must not leak into a production
+// build deployed behind the Worker proxy.
+const usableBase =
+  import.meta.env.PROD && configuredBase === 'http://localhost:4000' ? '' : configuredBase;
 
-if (!import.meta.env.VITE_API_BASE_URL && !import.meta.env.DEV) {
-  console.error(
-    '[api-client] VITE_API_BASE_URL is not configured — API requests will target http://localhost:4000 and likely fail.',
-  );
-}
+export const API_BASE: string =
+  usableBase || (import.meta.env.DEV ? 'http://localhost:4000' : '');
 
 export class ApiError extends Error {
   status: number;
@@ -47,45 +47,46 @@ function attemptTokenRefresh(): Promise<boolean> {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     })
-      .then((r) => r.ok)
+      .then((res) => res.ok)
       .catch(() => false)
-      .finally(() => { refreshAttempt = null; });
+      .finally(() => {
+        refreshAttempt = null;
+      });
   }
   return refreshAttempt;
 }
 
-async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
-  const isFormData = options.body instanceof FormData;
+interface RequestOptions extends RequestInit {
+  idempotent?: boolean;
+}
 
-  const fetchOpts: RequestInit = {
-    credentials: 'include',
-    headers: isFormData
-      ? {}
-      : {
-          'Content-Type': 'application/json',
-          ...(options.headers ?? {}),
-        },
-    ...options,
-  };
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const headers =
+    init.body instanceof FormData
+      ? (init.headers ?? {})
+      : { 'Content-Type': 'application/json', ...(init.headers ?? {}) };
+  const config: RequestInit = { credentials: 'include', headers, ...init };
+
   let response: Response;
   try {
-    response = await fetch(url, fetchOpts);
+    response = await fetch(url, config);
   } catch {
     throw new ApiError(0, 'Network error. Check your connection and try again.');
   }
 
   if (response.status === 401) {
-    // Don't try to refresh if this IS the refresh or login request (prevent loops).
-    const isAuthEndpoint = path.includes('/api/users/refresh') || path.includes('/api/users/login');
+    const isAuthEndpoint =
+      path.includes('/api/users/refresh') || path.includes('/api/users/login');
+
     if (!isAuthEndpoint && (await attemptTokenRefresh())) {
-      // Fresh cookies set — retry original request.
       try {
-        response = await fetch(url, fetchOpts);
+        response = await fetch(url, config);
       } catch {
         throw new ApiError(0, 'Network error. Check your connection and try again.');
       }
     }
+
     if (response.status === 401) {
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       throw new ApiError(401, 'Session expired. Please log in again.');
@@ -104,8 +105,8 @@ async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T>
 
   if (!response.ok) {
     const message =
-      (typeof data === 'object' && data !== null && 'message' in data
-        ? String((data as { message?: unknown }).message)
+      (typeof data === 'object' && data && 'message' in data
+        ? String((data as { message: unknown }).message)
         : null) ?? `Request failed (${response.status})`;
     throw new ApiError(response.status, message, data);
   }
@@ -119,26 +120,44 @@ function idempotencyHeaders(): Record<string, string> {
       return { 'Idempotency-Key': crypto.randomUUID() };
     }
   } catch {
-    /* noop */
+    // Fall through to the timestamp-based key.
   }
   return { 'Idempotency-Key': `${Date.now()}-${Math.random().toString(36).slice(2)}` };
 }
 
 export const api = {
   get: <T>(path: string, params?: Record<string, unknown>) =>
-    apiClient<T>(buildUrl(path, params)),
-  post: <T>(path: string, body?: unknown, opts?: { idempotent?: boolean }) =>
-    apiClient<T>(path, {
+    request<T>(buildUrl(path, params)),
+
+  post: <T>(path: string, body?: unknown, options?: { idempotent?: boolean }) =>
+    request<T>(path, {
       method: 'POST',
-      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
-      headers: opts?.idempotent ? idempotencyHeaders() : undefined,
+      body:
+        body instanceof FormData
+          ? body
+          : body === undefined
+            ? undefined
+            : JSON.stringify(body),
+      headers: options?.idempotent ? idempotencyHeaders() : undefined,
     }),
+
   put: <T>(path: string, body?: unknown) =>
-    apiClient<T>(path, { method: 'PUT', body: body !== undefined ? JSON.stringify(body) : undefined }),
+    request<T>(path, {
+      method: 'PUT',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+
   patch: <T>(path: string, body?: unknown) =>
-    apiClient<T>(path, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined }),
+    request<T>(path, {
+      method: 'PATCH',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+
   delete: <T>(path: string, body?: unknown) =>
-    apiClient<T>(path, { method: 'DELETE', body: body !== undefined ? JSON.stringify(body) : undefined }),
+    request<T>(path, {
+      method: 'DELETE',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
 };
 
 export function apiPdfUrl(path: string): string {

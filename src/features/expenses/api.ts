@@ -5,6 +5,20 @@ import type { ExpenseInput } from './schemas';
 
 type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
+export interface ExpenseApiRecord {
+  id: string;
+  amount: number | string;
+  txnCategory?: string | null;
+  category?: string | null;
+  effectiveDate?: string;
+  date?: string;
+  description?: string | null;
+  paymentMethod?: string | null;
+  paymentRef?: string | null;
+  receiptReference?: string | null;
+  createdAt: string;
+}
+
 export interface ExpenseSummaryParams {
   search?: string;
   category?: string;
@@ -20,7 +34,7 @@ export interface ExpenseSummary {
 
 export const expensesApi = {
   list: (params?: ExpenseListParams) =>
-    api.get<PaginatedResponse<Expense> | ApiResponse<Expense[]>>(
+    api.get<PaginatedResponse<ExpenseApiRecord> | ApiResponse<ExpenseApiRecord[]>>(
       '/api/expenses',
       (params ?? {}) as QueryParams,
     ),

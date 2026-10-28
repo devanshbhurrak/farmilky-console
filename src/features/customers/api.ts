@@ -167,14 +167,9 @@ function toCustomerPayload(data: unknown, mode: 'create' | 'update'): RawRecord 
   if (area) payload.assignedAreaId = area;
   const seq = o.deliveryConfig?.deliverySequence;
   if (seq !== undefined && !Number.isNaN(seq)) payload.deliverySequence = seq;
-  // Address data is forwarded for forward-compatibility. The current backend
-  // schema (adminCreateUserSchema / adminUpdateUserSchema) does not persist
-  // addresses — they live in the user_addresses table — so these fields are
-  // currently stripped by Zod. Keeping them in the payload means address
-  // persistence will work once the backend accepts them.
   if (o.address) {
     const { street, city, pincode } = o.address;
-    if (street || city || pincode) payload.address = { street, city, pincode };
+    payload.address = { street, city, pincode };
   }
   return payload;
 }

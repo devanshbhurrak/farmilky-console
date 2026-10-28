@@ -1,27 +1,20 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { StatCard } from '@/components/data/stat-card';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { FilterBar, type ActiveFilter } from '@/components/data/filter-bar';
-import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
-import { FormField } from '@/components/form/form-field';
-import { SearchInput } from '@/components/data/search-input';
+import { CircleDollarSign, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
-import { PageHeader } from '@/components/layout/page-header';
-import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
+import { ListView } from '@/components/data/list-view';
+import type { Column } from '@/components/data/data-table';
+import { StatCard } from '@/components/data/stat-card';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, formatDate, getId, titleCase } from '@/lib/utils';
+import { formatCurrency, formatDate, getErrorMessage, getId, titleCase } from '@/lib/utils';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHODS,
-  type Expense,
-  type ExpenseListParams,
 } from '@/types/expense';
+import type { Expense, ExpenseListParams } from '@/types/expense';
 import {
   useCreateExpense,
   useDeleteExpense,
@@ -31,86 +24,104 @@ import {
 } from './hooks';
 import type { ExpenseInput } from './schemas';
 import { ExpenseForm } from './components/expense-form';
-import { ExpenseTable } from './components/expense-table';
 
 const PAGE_SIZE = 20;
 
-function toExpenseInput(e: Expense): ExpenseInput {
-  const category = (EXPENSE_CATEGORIES as readonly string[]).includes(e.category)
-    ? (e.category as ExpenseInput['category'])
+function toExpenseInput(expense: Expense): ExpenseInput {
+  const category = (EXPENSE_CATEGORIES as readonly string[]).includes(expense.category)
+    ? (expense.category as ExpenseInput['category'])
     : 'miscellaneous';
   const paymentMethod = (EXPENSE_PAYMENT_METHODS as readonly string[]).includes(
-    e.paymentMethod ?? '',
+    expense.paymentMethod ?? '',
   )
-    ? (e.paymentMethod as ExpenseInput['paymentMethod'])
+    ? (expense.paymentMethod as ExpenseInput['paymentMethod'])
     : 'cash';
   return {
-    amount: e.amount,
+    amount: expense.amount,
     category,
-    date: typeof e.date === 'string' ? e.date.slice(0, 10) : '',
-    description: e.description ?? '',
+    date: typeof expense.date === 'string' ? expense.date.slice(0, 10) : '',
+    description: expense.description ?? '',
     paymentMethod,
-    receiptReference: e.receiptReference ?? '',
+    receiptReference: expense.receiptReference ?? '',
   };
 }
 
 export default function ExpensesPage() {
   const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<Expense | null>(null);
+  const [deleting, setDeleting] = React.useState<Expense | null>(null);
+  const parsedPage = Number(searchParams.get('page'));
+  const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const rawSearch = searchParams.get('search') ?? '';
   const category = searchParams.get('category') ?? 'all';
   const from = searchParams.get('from') ?? '';
   const to = searchParams.get('to') ?? '';
   const debouncedSearch = useDebounce(rawSearch, 400);
 
-  const filters = useFilterDrawer({ category, from, to });
+  const filterConfig = {
+    fields: {
+      category: {
+        label: 'Category',
+        type: 'select' as const,
+        options: [
+          { value: 'all', label: 'All categories' },
+          ...EXPENSE_CATEGORIES.map((value) => ({ value, label: titleCase(value) })),
+        ],
+      },
+      from: { label: 'From date', type: 'date' as const },
+      to: { label: 'To date', type: 'date' as const },
+    },
+    initialValues: { category: 'all', from: '', to: '' },
+  };
 
+  const updateUrl = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === 'all' || (key === 'page' && value === '1')) next.delete(key);
+      else next.set(key, value);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const search = debouncedSearch.trim() || undefined;
   const listParams: ExpenseListParams = {
     page,
     limit: PAGE_SIZE,
-    search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
+    search,
     category: category !== 'all' ? category : undefined,
     startDate: from || undefined,
     endDate: to || undefined,
   };
-  const { data, isLoading, isError, refetch } = useExpenses(listParams);
+  const query = useExpenses(listParams);
   const summaryQuery = useExpenseSummary({
-    search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
+    search,
     category: category !== 'all' ? category : undefined,
     startDate: from || undefined,
     endDate: to || undefined,
   });
-
-  const items = data?.items ?? [];
-  const meta = data?.meta ?? { total: 0, page, limit: PAGE_SIZE, totalPages: 0 };
-  const summary = summaryQuery.data;
-  const topCategory = (summary?.byCategory ?? []).reduce<
-    { category: string; total: number; count: number } | null
-  >((best, cur) => (best === null || cur.total > best.total ? cur : best), null);
-
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
   const deleteMutation = useDeleteExpense();
+  const saving = createMutation.isPending || updateMutation.isPending;
+  const items = query.data?.items ?? [];
+  const meta = query.data?.meta ?? { total: 0, page, limit: PAGE_SIZE, totalPages: 0 };
+  const summary = summaryQuery.data;
+  const topCategory = React.useMemo(
+    () => [...(summary?.byCategory ?? [])].sort((a, b) => b.total - a.total)[0],
+    [summary?.byCategory],
+  );
 
-  const [sheetOpen, setSheetOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<Expense | null>(null);
-  const [deleting, setDeleting] = React.useState<Expense | null>(null);
+  const openCreate = React.useCallback(() => {
+    setEditing(null);
+    setSheetOpen(true);
+  }, []);
 
-  const updateUrl = (patch: Record<string, string | null>) => {
-    const next = new URLSearchParams(searchParams);
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === null || v === '') next.delete(k);
-      else next.set(k, v);
-    }
-    setSearchParams(next);
-  };
-
-  const activeFilters: ActiveFilter[] = [];
-  if (category !== 'all')
-    activeFilters.push({ key: 'category', label: 'Category', value: titleCase(category) });
-  if (from) activeFilters.push({ key: 'from', label: 'From', value: formatDate(from) });
-  if (to) activeFilters.push({ key: 'to', label: 'To', value: formatDate(to) });
+  const openEdit = React.useCallback((expense: Expense) => {
+    setEditing(expense);
+    setSheetOpen(true);
+  }, []);
 
   const handleFormSubmit = (values: ExpenseInput) => {
     if (editing) {
@@ -126,149 +137,184 @@ export default function ExpensesPage() {
   const createAction = React.useMemo(
     () =>
       isAdmin ? (
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setSheetOpen(true);
-          }}
-          className="px-3 py-1.5 text-sm"
-        >
-          <Plus aria-hidden />
-          Expense
+        <Button onClick={openCreate} className="px-3 py-1.5 text-sm">
+          <Plus aria-hidden /> Expense
         </Button>
       ) : null,
-    [isAdmin, setEditing, setSheetOpen],
+    [isAdmin, openCreate],
   );
-  useRegisterHeaderAction(createAction);
+
+  const activeFilters: { key: string; label: string; value: string }[] = [];
+  if (category !== 'all') {
+    activeFilters.push({ key: 'category', label: 'Category', value: titleCase(category) });
+  }
+  if (from) activeFilters.push({ key: 'from', label: 'From', value: from });
+  if (to) activeFilters.push({ key: 'to', label: 'To', value: to });
+
+  const columns: Column<Expense>[] = [
+    {
+      header: 'Expense',
+      cell: (expense) => (
+        <div>
+          <p className="font-medium text-slate-900">{expense.description || '—'}</p>
+          <p className="text-xs text-slate-500">
+            {titleCase(expense.category)} · {titleCase(expense.paymentMethod ?? '—')}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: 'Amount',
+      cell: (expense) => (
+        <span className="font-medium text-slate-900">{formatCurrency(expense.amount)}</span>
+      ),
+    },
+    { header: 'Date', cell: (expense) => formatDate(expense.date), hideOnMobile: true },
+    {
+      header: 'Category',
+      cell: (expense) => titleCase(expense.category),
+      hideOnMobile: true,
+    },
+  ];
+
+  if (isAdmin) {
+    columns.push({
+      header: 'Actions',
+      cell: (expense) => (
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Edit expense ${formatCurrency(expense.amount)}`}
+            onClick={() => openEdit(expense)}
+          >
+            <Pencil aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Delete expense ${formatCurrency(expense.amount)}`}
+            onClick={() => setDeleting(expense)}
+          >
+            <Trash2 aria-hidden />
+          </Button>
+        </div>
+      ),
+    });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Expenses" />
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="Total" value={formatCurrency(summary?.total ?? 0)} />
-        <StatCard label="Entries" value={summary?.count ?? 0} />
+    <ListView<Expense>
+      title="Expenses"
+      createAction={createAction}
+      searchPlaceholder="Search expenses..."
+      searchValue={rawSearch}
+      onSearchChange={(value) => updateUrl({ search: value, page: '1' })}
+      filterConfig={filterConfig}
+      columns={columns}
+      data={items}
+      keyExtractor={(expense, index) => getId(expense) || `expense-${index}`}
+      loading={query.isLoading}
+      error={query.isError ? getErrorMessage(query.error) : null}
+      onRetry={() => query.refetch()}
+      emptyTitle="No expenses found"
+      emptyMessage="Try adjusting your search or filters."
+      emptyActionLabel={isAdmin ? 'Add expense' : undefined}
+      onEmptyAction={isAdmin ? openCreate : undefined}
+      renderCard={(expense) => (
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1 p-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate font-medium text-slate-900">
+                {expense.description || 'No description'}
+              </p>
+              <span className="shrink-0 font-semibold text-slate-900">
+                {formatCurrency(expense.amount)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {titleCase(expense.category)} · {titleCase(expense.paymentMethod ?? '—')} ·{' '}
+              {formatDate(expense.date)}
+            </p>
+          </div>
+          {isAdmin && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={`Edit expense ${formatCurrency(expense.amount)}`}
+                onClick={() => openEdit(expense)}
+              >
+                <Pencil aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={`Delete expense ${formatCurrency(expense.amount)}`}
+                onClick={() => setDeleting(expense)}
+              >
+                <Trash2 aria-hidden />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      page={meta.page}
+      totalPages={meta.totalPages}
+      total={meta.total}
+      onPageChange={(nextPage) => updateUrl({ page: String(nextPage) })}
+    >
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Expense summary">
+        <StatCard
+          label="Total expenses"
+          value={
+            summaryQuery.isError
+              ? 'Unavailable'
+              : summaryQuery.isLoading
+                ? 'Loading…'
+                : formatCurrency(summary?.total)
+          }
+          icon={<CircleDollarSign className="size-4" aria-hidden />}
+        />
+        <StatCard
+          label="Expense entries"
+          value={
+            summaryQuery.isError
+              ? 'Unavailable'
+              : summaryQuery.isLoading
+                ? '—'
+                : summary?.count ?? 0
+          }
+          icon={<Receipt className="size-4" aria-hidden />}
+        />
         <StatCard
           label="Top category"
-          value={topCategory ? titleCase(topCategory.category) : '—'}
-          subtitle={topCategory ? formatCurrency(topCategory.total) : undefined}
+          value={
+            summaryQuery.isError
+              ? 'Unavailable'
+              : summaryQuery.isLoading
+                ? 'Loading…'
+                : topCategory
+                  ? titleCase(topCategory.category)
+                  : '—'
+          }
+          icon={<Receipt className="size-4" aria-hidden />}
+          subtitle={
+            topCategory
+              ? `${formatCurrency(topCategory.total)} · ${topCategory.count} entries`
+              : undefined
+          }
         />
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          <SearchInput
-            value={rawSearch}
-            onChange={(v) => updateUrl({ search: v, page: null })}
-            placeholder="Search expenses…"
-            className="flex-1"
-          />
-          <FilterButton activeCount={activeFilters.length} onClick={filters.openDrawer} />
-        </div>
-        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-3 md:grid">
-          <Select
-            value={category}
-            onChange={(e) =>
-              updateUrl({ category: e.target.value === 'all' ? '' : e.target.value, page: null })
-            }
-            aria-label="Filter by category"
-          >
-            <option value="all">All categories</option>
-            {EXPENSE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {titleCase(c)}
-              </option>
-            ))}
-          </Select>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => updateUrl({ from: e.target.value, page: null })}
-            aria-label="From date"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => updateUrl({ to: e.target.value, page: null })}
-            aria-label="To date"
-          />
-        </div>
-      </div>
-
-      <FilterDrawer
-        open={filters.open}
-        onOpenChange={filters.setOpen}
-        activeCount={activeFilters.length}
-        onApply={() => {
-          updateUrl({
-            category: filters.draft.category === 'all' ? '' : filters.draft.category,
-            from: filters.draft.from,
-            to: filters.draft.to,
-            page: null,
-          });
-          filters.setOpen(false);
-        }}
-        onReset={() => filters.setDraft({ category: 'all', from: '', to: '' })}
-      >
-        <FormField label="Category">
-          <Select
-            value={filters.draft.category}
-            onChange={(e) => filters.setField('category', e.target.value)}
-            aria-label="Filter by category"
-          >
-            <option value="all">All categories</option>
-            {EXPENSE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {titleCase(c)}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="From date">
-            <Input
-              type="date"
-              value={filters.draft.from}
-              onChange={(e) => filters.setField('from', e.target.value)}
-              aria-label="From date"
-            />
-          </FormField>
-          <FormField label="To date">
-            <Input
-              type="date"
-              value={filters.draft.to}
-              onChange={(e) => filters.setField('to', e.target.value)}
-              aria-label="To date"
-            />
-          </FormField>
-        </div>
-      </FilterDrawer>
-
-      <FilterBar
-        filters={activeFilters}
-        onRemove={(key) => updateUrl({ [key]: '', page: null })}
-        onClearAll={() => updateUrl({ category: '', from: '', to: '', page: null })}
-      />
-
-      <ExpenseTable
-        data={items}
-        loading={isLoading}
-        error={isError ? 'Failed to load expenses' : null}
-        onRetry={() => refetch()}
-        page={meta.page}
-        totalPages={meta.totalPages}
-        total={meta.total}
-        onPageChange={(next) => updateUrl({ page: String(next) })}
-        onEdit={
-          isAdmin
-            ? (e) => {
-                setEditing(e);
-                setSheetOpen(true);
-              }
-            : undefined
-        }
-        onDelete={isAdmin ? (e) => setDeleting(e) : undefined}
-      />
+        {summaryQuery.isError && (
+          <p role="alert" className="text-sm text-red-600 sm:col-span-3">
+            Expense summary failed to load: {getErrorMessage(summaryQuery.error)}
+          </p>
+        )}
+      </section>
 
       {isAdmin && (
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -281,7 +327,7 @@ export default function ExpensesPage() {
                 key={editing ? getId(editing) : 'new'}
                 defaultValues={editing ? toExpenseInput(editing) : undefined}
                 onSubmit={handleFormSubmit}
-                submitting={createMutation.isPending || updateMutation.isPending}
+                submitting={saving}
               />
             </SheetBody>
           </SheetContent>
@@ -308,6 +354,6 @@ export default function ExpensesPage() {
           });
         }}
       />
-    </div>
+    </ListView>
   );
 }

@@ -40,10 +40,10 @@ export interface CustomerListParams {
   page?: number;
   limit?: number;
   search?: string;
-  status?: string;
+  isActive?: boolean;
   areaId?: string;
-  balance?: string;
-  sortBy?: string;
+  balance?: 'positive' | 'negative' | 'zero' | 'non_positive';
+  sortBy?: 'createdAt' | 'name' | 'accountBalance';
   sortOrder?: 'asc' | 'desc';
 }
 

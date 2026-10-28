@@ -13,3 +13,8 @@ dist/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# wrangler
+.wrangler/
+.wrangler-dist/
+
