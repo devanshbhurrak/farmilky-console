@@ -5,7 +5,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage, normalizeList, unwrapData } from '@/lib/utils';
 import type { DeliveryHistoryEntry, Subscription, SubscriptionListParams } from '@/types/subscription';
 import { subscriptionsApi } from './api';
-import type { SubscriptionDetail } from './api';
+import type { ScheduleChangeRequest, SubscriptionDetail } from './api';
 import type { SubscriptionInput, SubscriptionOutcomeInput } from './schemas';
 
 function monthKey(month: string | number | undefined, year: string | number | undefined): string | null {
@@ -70,25 +70,20 @@ export function useSubscriptionHistory(
     queryFn: async (): Promise<{ items: DeliveryHistoryEntry[] }> => {
       const subId = id as string;
       try {
-        const res = await subscriptionsApi.history(subId, { month, year });
+        const res = await subscriptionsApi.history(subId, { month, year, limit: 100 });
         const { items } = normalizeList<DeliveryHistoryEntry>(res, ['history', 'deliveries', 'records']);
         return { items: filterByMonth(items, month, year) };
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
-          try {
-            const detail = await subscriptionsApi.get(subId);
-            const data = unwrapData<SubscriptionDetail>(detail);
-            const embedded = data.history ?? data.deliveries ?? [];
-            return { items: filterByMonth(embedded, month, year) };
-          } catch {
-            return { items: [] };
-          }
+          const detail = await subscriptionsApi.get(subId);
+          const data = unwrapData<SubscriptionDetail>(detail);
+          const embedded = data.history ?? data.deliveries ?? [];
+          return { items: filterByMonth(embedded, month, year) };
         }
         throw err;
       }
     },
     enabled: Boolean(id),
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -137,8 +132,7 @@ export function useUpdateSubscriptionStatus() {
 export function useBulkPause() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ ids, pauseFrom, pauseUntil }: { ids: string[]; pauseFrom?: string; pauseUntil?: string }) =>
-      subscriptionsApi.bulkPause(ids, { pauseFrom, pauseUntil }),
+    mutationFn: (ids: string[]) => subscriptionsApi.bulkPause(ids),
     onSuccess: () => {
       invalidateSubscriptionQueries(queryClient);
       toast.success('Subscriptions paused');
@@ -166,13 +160,15 @@ export function useScheduleChange() {
       id,
       data,
     }: {
-      id: string;      data: { effectiveDate: string; deliverySchedule?: string; scheduledQty?: number; scheduledPrice?: number; quantityPerDay?: number; slot?: string };
+      id: string;
+      data: ScheduleChangeRequest;
     }) =>
     subscriptionsApi.scheduleChange(id, {
       effectiveDate: data.effectiveDate,
       scheduledQty: data.scheduledQty ?? data.quantityPerDay,
       scheduledPrice: data.scheduledPrice,
       deliverySchedule: data.deliverySchedule,
+      customDays: data.customDays,
       slot: data.slot,
     }),
     onSuccess: () => {

@@ -14,6 +14,7 @@ export interface DeliveryBoardParams {
 
 export interface BoardOutcomeRequest {
   status: string;
+  slot?: 'morning' | 'evening';
   actualQuantity?: number;
   reason?: string;
   notes?: string;

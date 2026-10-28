@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from './api';
 import { queryKeys } from '@/lib/query-keys';
@@ -110,4 +111,76 @@ export function useOpenWork() {
     },
     staleTime: STALE,
   });
+}
+
+/**
+ * Product id → display name. Today-supply items only carry `productId`, so the
+ * load sheet needs the catalog to render readable product rows.
+ */
+export function useProductCatalog() {
+  return useQuery({
+    queryKey: [...queryKeys.products.all(), 'catalog'],
+    queryFn: async () => {
+      const res = unwrapOrThrow(await dashboardApi.products());
+      const { items } = normalizeList<{ id?: string; _id?: string; name?: string }>(res, ['products']);
+      const names: Record<string, string> = {};
+      for (const p of items) {
+        const id = p.id ?? p._id;
+        if (id) names[id] = p.name ?? id;
+      }
+      return names;
+    },
+    staleTime: STALE,
+  });
+}
+
+interface SupplyGroup {
+  userIds: Set<string>;
+  liters: number;
+  qty: number;
+  amount: number;
+  label?: string;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Today's load sheet: today-supply returns one raw row per active
+ * subscription, so group by product and compute the customers / liters /
+ * deliveries / amount the table columns expect.
+ */
+export function useLoadSheet() {
+  const supply = useTodaySupply();
+  const catalog = useProductCatalog();
+
+  const rows = useMemo<SupplyRow[]>(() => {
+    const items = (supply.data?.rows ?? []) as Record<string, unknown>[];
+    const grouped = new Map<string, SupplyGroup>();
+    for (const sub of items) {
+      const productId = sub.productId != null ? String(sub.productId) : '';
+      const label = sub.variantLabel != null && String(sub.variantLabel) !== '' ? String(sub.variantLabel) : undefined;
+      const key = productId || label || 'unknown';
+      const entry: SupplyGroup =
+        grouped.get(key) ?? { userIds: new Set<string>(), liters: 0, qty: 0, amount: 0, label };
+      if (sub.userId != null) entry.userIds.add(String(sub.userId));
+      entry.liters = round2(entry.liters + (Number(sub.quantityPerDelivery) || 0));
+      entry.qty += 1;
+      entry.amount = round2(entry.amount + (Number(sub.totalPricePerDelivery) || 0));
+      grouped.set(key, entry);
+    }
+    const names = catalog.data ?? {};
+    return [...grouped.entries()].map(([key, g]) => ({
+      product: names[key] ?? g.label ?? 'Unknown product',
+      customers: g.userIds.size,
+      liters: g.liters,
+      qty: g.qty,
+      amount: g.amount,
+    }));
+  }, [supply.data, catalog.data]);
+
+  return {
+    rows,
+    isLoading: supply.isLoading || catalog.isLoading,
+    isError: supply.isError || catalog.isError,
+  };
 }

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { FormField } from '@/components/form/form-field';
 import { Sheet, SheetBody, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBulkPause, useBulkResume } from '../hooks';
 
@@ -14,8 +12,6 @@ export function SubscriptionBulkActions({
   onDone: () => void;
 }) {
   const [pauseOpen, setPauseOpen] = useState(false);
-  const [pauseFrom, setPauseFrom] = useState('');
-  const [pauseUntil, setPauseUntil] = useState('');
 
   const bulkPause = useBulkPause();
   const bulkResume = useBulkResume();
@@ -24,7 +20,7 @@ export function SubscriptionBulkActions({
 
   const pause = () => {
     bulkPause.mutate(
-      { ids: selectedIds, pauseFrom: pauseFrom || undefined, pauseUntil: pauseUntil || undefined },
+      selectedIds,
       {
         onSuccess: () => {
           setPauseOpen(false);
@@ -60,18 +56,13 @@ export function SubscriptionBulkActions({
           <SheetHeader>
             <SheetTitle>Pause {selectedIds.length} subscriptions</SheetTitle>
           </SheetHeader>
-          <div className="mt-4 flex flex-col gap-4">
-            <FormField label="Pause from" hint="Optional start date">
-              <Input type="date" value={pauseFrom} onChange={(e) => setPauseFrom(e.target.value)} />
-            </FormField>
-            <FormField label="Pause until" hint="Optional end date">
-              <Input type="date" value={pauseUntil} onChange={(e) => setPauseUntil(e.target.value)} />
-            </FormField>
+          <div className="mt-4 text-sm text-slate-600">
+            These subscriptions will be paused immediately. Resume them when deliveries should restart.
           </div>
         </SheetBody>
         <SheetFooter>
           <Button onClick={pause} loading={bulkPause.isPending} className="min-h-11 w-full">
-            Pause selected
+            Pause now
           </Button>
         </SheetFooter>
       </Sheet>

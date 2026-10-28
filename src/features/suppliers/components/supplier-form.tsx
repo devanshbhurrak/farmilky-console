@@ -15,7 +15,7 @@ const SESSIONS = [
 ] as const;
 
 // Default to morning session only to match backend defaults
-const DEFAULT_SESSIONS = ['morning'] as const;
+const DEFAULT_SESSIONS: ('morning' | 'evening')[] = ['morning'];
 
 export function SupplierForm({
   defaultValues,
@@ -104,7 +104,7 @@ export function SupplierForm({
                       onChange={(e) => {
                         const current = field.value ?? [];
                         field.onChange(
-                          e.target.checked ? [...current, s.value] : current.filter((v) => v !== s.value),
+                          e.target.checked ? [...current, s.value] : current.filter((v: string) => v !== s.value),
                         );
                       }}
                     />

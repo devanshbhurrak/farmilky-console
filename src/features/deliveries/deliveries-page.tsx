@@ -45,13 +45,6 @@ export default function DeliveriesPage() {
 
   const debouncedSearch = useDebounce(search, 400);
 
-  const updateParam = (key: string, value: string) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setSearchParams(next, { replace: true });
-  };
-
   useDeliveryBoardSSE(true);
 
   const areasQuery = useQuery({
@@ -69,20 +62,43 @@ export default function DeliveriesPage() {
   const boardQuery = useDeliveryBoard({
     date,
     slot: slot === 'all' ? undefined : slot,
-    page: 1,
-    limit: 100,
-    type: type === 'all' ? undefined : type,
-    status: status || undefined,
-    area: area || undefined,
-    search: debouncedSearch || undefined,
-    sort: sort || undefined,
   });
 
   const entries = useMemo(() => boardQuery.data?.entries ?? [], [boardQuery.data]);
-  const summary = boardQuery.data?.summary;
+
+  // Client-side filtering (since backend now returns all entries for the date/slot)
+  const filteredEntries = useMemo(() => {
+    return entries.filter((e) => {
+      if (type !== 'all' && e.type !== type) return false;
+      if (status && e.deliveryStatus !== status) return false;
+      if (area && e.areaId !== area) return false;
+      if (debouncedSearch) {
+        const needle = debouncedSearch.trim().toLowerCase();
+        const haystack = [
+          e.customerName,
+          e.productName,
+          e.areaName,
+          e.phone,
+          e.address,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [entries, type, status, area, debouncedSearch]);
+
+  const summary = useMemo(
+    () => ({
+      total: filteredEntries.length,
+      remainingDeliveries: filteredEntries.filter((entry) => entry.canRecordOutcome).length,
+      delivered: filteredEntries.filter((entry) => entry.deliveryStatus === 'delivered').length,
+      pending: filteredEntries.filter((entry) => entry.deliveryStatus === 'pending').length,
+    }),
+    [filteredEntries],
+  );
 
   const groups = useMemo<CustomerGroupData[]>(() => {
-    const sorted = [...entries];
+    const sorted = [...filteredEntries];
     if (sort === 'name') {
       sorted.sort((a, b) => (a.customerName ?? '').localeCompare(b.customerName ?? ''));
     } else {
@@ -109,13 +125,14 @@ export default function DeliveriesPage() {
       }
     }
     return [...map.values()];
-  }, [entries, sort]);
+  }, [filteredEntries, sort]);
 
   const keyToEntry = useMemo(() => {
     const m = new Map<string, DeliveryBoardEntry>();
-    for (const e of entries) m.set(entryKeyOf(e), e);
+    for (const e of filteredEntries) m.set(entryKeyOf(e), e);
     return m;
-  }, [entries]);
+  }, [filteredEntries]);
+  const visibleSelectedIds = selectedIds.filter((id) => keyToEntry.has(id));
 
   const confirmGroup = groups.find((g) => g.key === confirmGroupKey) ?? null;
 
@@ -131,7 +148,11 @@ export default function DeliveriesPage() {
         if (target.kind === 'order') {
           await deliveriesApi.recordOrderOutcome(target.id, { status: 'delivered' });
         } else {
-          await deliveriesApi.recordSubscriptionOutcome(target.id, { status: 'delivered' });
+          await deliveriesApi.recordSubscriptionOutcome(target.id, {
+            status: 'delivered',
+            deliveryDate: date,
+            slot: entry.deliverySlot ?? undefined,
+          });
         }
         done += 1;
       } catch (err) {
@@ -145,7 +166,7 @@ export default function DeliveriesPage() {
   };
 
   const handleBulkDeliver = async () => {
-    const targets = selectedIds
+    const targets = visibleSelectedIds
       .map((k) => keyToEntry.get(k))
       .filter((e): e is DeliveryBoardEntry => Boolean(e));
     if (targets.length === 0) return;
@@ -205,6 +226,16 @@ export default function DeliveriesPage() {
       <DeliveryFilters
         filters={{ date, slot, type, status, area, search, sort }}
         onChange={(next) => {
+          if (
+            next.date !== date ||
+            next.slot !== slot ||
+            next.type !== type ||
+            next.status !== status ||
+            next.area !== area ||
+            next.search !== search
+          ) {
+            setSelectedIds([]);
+          }
           const sp = new URLSearchParams(searchParams);
           const apply = (k: string, v: string, fallback: string) => {
             if (v && v !== fallback) sp.set(k, v);
@@ -251,7 +282,7 @@ export default function DeliveriesPage() {
               }}
               onConfirmAll={() => setConfirmGroupKey(g.key)}
               onAddExtra={() => setExtraGroup(g)}
-              selectedIds={selectedIds}
+              selectedIds={visibleSelectedIds}
               onToggleSelect={toggleSelect}
               confirming={confirming && confirmGroupKey === g.key}
             />
@@ -260,7 +291,7 @@ export default function DeliveriesPage() {
       )}
 
       <BulkActionsBar
-        count={selectedIds.length}
+        count={visibleSelectedIds.length}
         onDeliverAll={handleBulkDeliver}
         onClear={() => setSelectedIds([])}
         loading={bulkLoading}

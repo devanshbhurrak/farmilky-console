@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetBody, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { toast } from 'sonner';
-import { formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
+import { formatCurrency, formatDate, getErrorMessage, getId, todayLocal } from '@/lib/utils';
 import type { DeliveryHistoryEntry } from '@/types/subscription';
 import { useDeleteHistoryEntry, useRecordSubscriptionOutcome, useSubscriptionHistory } from '../hooks';
 import { outcomeSchema } from '../schemas';
@@ -265,7 +265,7 @@ export function DeliveryHistory({
           </SheetHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-4">
             <FormField label="Delivery date" required error={form.formState.errors.deliveryDate?.message}>
-              <Input type="date" {...form.register('deliveryDate')} />
+              <Input type="date" max={todayLocal()} {...form.register('deliveryDate')} />
             </FormField>
             {isMultiSlot && (
               <FormField label="Slot" required error={form.formState.errors.slot?.message}>

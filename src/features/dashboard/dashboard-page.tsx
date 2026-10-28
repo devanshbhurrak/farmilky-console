@@ -2,15 +2,17 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { todayLocal, unwrapData } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
+import { useOrders } from '@/features/orders/hooks';
+import { useSubscriptions } from '@/features/subscriptions/hooks';
 import {
   useAdminStats,
   useBoardSummary,
   useDeliveryPerformance,
   useDeliveryStats,
+  useLoadSheet,
   useOpenWork,
   useProfitStats,
   useTodayShift,
-  useTodaySupply,
 } from './hooks';
 import type { DashboardStat, ProfitData } from './types';
 import { MetricCards } from './components/metric-cards';
@@ -47,11 +49,24 @@ export default function DashboardPage() {
   const profitQuery = useProfitStats();
   const shiftQuery = useTodayShift();
   const boardQuery = useBoardSummary(date);
-  const supplyQuery = useTodaySupply();
+  const loadSheet = useLoadSheet();
   const openWorkQuery = useOpenWork();
+  // Newest 5 of each for the Recent activity card.
+  const recentOrdersQuery = useOrders({ limit: 5 });
+  const recentSubsQuery = useSubscriptions({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' });
 
   const stats = toStats(statsQuery.data);
   const profit = toProfit(profitQuery.data);
+  // Deliveries progress for the Operations panel: today's delivered vs
+  // scheduled counts from /api/admin/stats. The /api/admin/delivery-stats
+  // endpoint only reports monthly litres and has no denominator, so it cannot
+  // drive the done/total progress bar.
+  const deliveryProgress = stats
+    ? {
+        scheduled: Number(stats.today_deliveries ?? 0),
+        delivered: Number(stats.today_delivered ?? 0),
+      }
+    : null;
   const pendingDeliveries = boardQuery.data?.remainingDeliveries ?? 0;
 
   // Surface fetch failures as a warning banner instead of blank cards.
@@ -62,8 +77,10 @@ export default function DashboardPage() {
     profitQuery.isError ? 'profit stats' : null,
     shiftQuery.isError ? 'milk collection shift' : null,
     boardQuery.isError ? 'delivery board' : null,
-    supplyQuery.isError ? 'supply sheet' : null,
+    loadSheet.isError ? 'supply sheet' : null,
     openWorkQuery.isError ? 'open work queue' : null,
+    recentOrdersQuery.isError ? 'recent orders' : null,
+    recentSubsQuery.isError ? 'recent subscriptions' : null,
   ].filter((s): s is string => s !== null);
 
   return (
@@ -92,21 +109,25 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : (
-        <MetricCards stats={stats} boardSummary={null} supplyRows={[]} pendingDeliveries={pendingDeliveries} />
+        <MetricCards stats={stats} pendingDeliveries={pendingDeliveries} />
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ProfitPanel data={profit} loading={profitQuery.isLoading} />
         <OperationsPanel
-          deliveryStats={deliveryStatsQuery.data}
+          deliveryStats={deliveryProgress}
           shift={shiftQuery.data ?? null}
-          loading={deliveryStatsQuery.isLoading || shiftQuery.isLoading}
+          loading={statsQuery.isLoading || shiftQuery.isLoading}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <LoadSheet rows={supplyQuery.data?.rows ?? null} loading={supplyQuery.isLoading} />
-        <RecentActivity stats={stats} loading={statsQuery.isLoading} />
+        <LoadSheet rows={loadSheet.rows} loading={loadSheet.isLoading} />
+        <RecentActivity
+          orders={recentOrdersQuery.data?.items}
+          subscriptions={recentSubsQuery.data?.items}
+          loading={recentOrdersQuery.isLoading || recentSubsQuery.isLoading}
+        />
       </div>
 
       <PerformancePanel

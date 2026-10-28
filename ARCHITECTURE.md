@@ -340,6 +340,7 @@ farmilky-management-v2/
     │   │   ├── hooks.ts
     │   │   ├── customers-page.tsx
     │   │   ├── customer-detail-page.tsx
+    │   │   ├── customer-utils.ts
     │   │   ├── components/
     │   │   │   ├── customer-form.tsx
     │   │   │   ├── customer-table.tsx

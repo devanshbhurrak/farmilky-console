@@ -280,7 +280,7 @@ export default function SuppliersPage() {
                   location: editing.location ?? '',
                   pincode: editing.pincode ?? '',
                   joiningDate: editing.joiningDate?.slice(0, 10) ?? '',
-                  collectionSessions: (editing.collectionSessions as ('morning' | 'evening')[]) ?? ['morning', 'evening'],
+                  collectionSessions: (Array.isArray(editing.collectionSessions) ? editing.collectionSessions : ['morning']) as ('morning' | 'evening')[],
                   defaultMorningQty: editing.defaultMorningQty,
                   defaultEveningQty: editing.defaultEveningQty,
                   defaultRatePerLiter: editing.defaultRatePerLiter,

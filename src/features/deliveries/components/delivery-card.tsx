@@ -19,6 +19,7 @@ export function DeliveryCard({
         <div className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-slate-900">{entry.productName ?? '—'}</span>
           <span className="text-slate-600">
+            {entry.deliverySlot && `${entry.deliverySlot === 'morning' ? 'Morning' : 'Evening'} · `}
             Scheduled {entry.scheduledQuantity ?? entry.quantity}
             {entry.actualQuantity != null && ` · Actual ${entry.actualQuantity}`} · Qty {qty}
             {entry.unit ? ` ${entry.unit}` : ''}

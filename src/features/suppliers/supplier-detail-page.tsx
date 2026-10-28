@@ -47,15 +47,15 @@ type AdjustmentValues = z.infer<typeof adjustmentSchema>;
 function RecordPaymentSection({ supplierId }: { supplierId: string }) {
   const form = useForm<PaymentValues>({
     resolver: zodResolver(paymentSchema) as unknown as Resolver<PaymentValues>,
-    defaultValues: { amount: undefined as unknown as number, fromDate: '', toDate: '', paymentMethod: 'upi', transactionRef: '', notes: '' },
+    defaultValues: { amount: 0, fromDate: '', toDate: '', paymentMethod: 'upi', transactionRef: '', notes: '' },
   });
 
   const fromDate = form.watch('fromDate');
   const toDate = form.watch('toDate');
   const { data: collectionTotal, isLoading: totalLoading } = useCollectionTotal(
     supplierId,
-    fromDate || undefined,
-    toDate || undefined,
+    fromDate && fromDate !== '' ? fromDate : undefined,
+    toDate && toDate !== '' ? toDate : undefined,
   );
   const mutation = useRecordSupplierPayment();
 
@@ -64,8 +64,8 @@ function RecordPaymentSection({ supplierId }: { supplierId: string }) {
       <form
         onSubmit={form.handleSubmit((v) =>
           mutation.mutate(
-            { supplierId, ...v, paymentMethod: v.paymentMethod || undefined },
-            { onSuccess: () => form.reset() },
+            { supplierId, ...v, paymentMethod: v.paymentMethod || undefined, amount: v.amount },
+            { onSuccess: () => form.reset({ amount: 0, fromDate: '', toDate: '', paymentMethod: 'upi', transactionRef: '', notes: '' }) },
           ),
         )}
         className="flex flex-col gap-4"
@@ -82,39 +82,43 @@ function RecordPaymentSection({ supplierId }: { supplierId: string }) {
           <span className="text-slate-500">Collection total{fromDate || toDate ? ' (selected period)' : ''}</span>
           <span className="flex items-center gap-2">
             <span className="font-semibold text-slate-900">
-              {totalLoading ? '…' : formatCurrency(collectionTotal?.total ?? 0)}
+              {totalLoading ? '…' : formatCurrency(collectionTotal?.grandTotal ?? 0)}
             </span>
             <Button
               type="button"
               size="sm"
               variant="outline"
               className="min-h-11"
-              disabled={totalLoading || !collectionTotal?.total}
-              onClick={() => form.setValue('amount', collectionTotal?.total ?? 0, { shouldValidate: true })}
+              disabled={totalLoading || !collectionTotal?.grandTotal}
+              onClick={() => form.setValue('amount', collectionTotal?.grandTotal ?? 0, { shouldValidate: true })}
             >
               Use total
             </Button>
           </span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label="Amount" required error={form.formState.errors.amount?.message}>
-            <Input type="number" min={1} placeholder="₹ Amount" {...form.register('amount')} />
+          <FormField label="Amount (₹)" required error={form.formState.errors.amount?.message}>
+            <Input type="number" min={1} step={0.01} {...form.register('amount', { valueAsNumber: true })} />
           </FormField>
-          <FormField label="Payment method">
-            <Select {...form.register('paymentMethod')}>
-              <option value="upi">UPI</option>
+          <FormField label="Payment method" error={form.formState.errors.paymentMethod?.message}>
+            <Select
+              value={form.watch('paymentMethod') || 'upi'}
+              onChange={(e) => form.setValue('paymentMethod', e.target.value)}
+              aria-label="Payment method"
+            >
               <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
               <option value="bank_transfer">Bank transfer</option>
-              <option value="card">Card</option>
-              <option value="other">Other</option>
             </Select>
           </FormField>
         </div>
-        <FormField label="Transaction ref">
-          <Input placeholder="UTR / ref no." {...form.register('transactionRef')} />
-        </FormField>
-        <FormField label="Notes">
-          <Input placeholder="Optional note" {...form.register('notes')} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField label="Transaction ref" error={form.formState.errors.transactionRef?.message}>
+            <Input placeholder="UTR / Reference" {...form.register('transactionRef')} />
+          </FormField>
+        </div>
+        <FormField label="Notes" error={form.formState.errors.notes?.message}>
+          <Input placeholder="Optional notes" {...form.register('notes')} />
         </FormField>
         <Button type="submit" loading={mutation.isPending} className="min-h-11 w-full sm:w-auto">
           Record payment
@@ -127,7 +131,7 @@ function RecordPaymentSection({ supplierId }: { supplierId: string }) {
 function AdjustmentSection({ supplierId }: { supplierId: string }) {
   const form = useForm<AdjustmentValues>({
     resolver: zodResolver(adjustmentSchema) as unknown as Resolver<AdjustmentValues>,
-    defaultValues: { type: 'credit', category: 'other', amount: undefined as unknown as number, date: todayLocal(), description: '' },
+    defaultValues: { type: 'credit', category: 'other', amount: 0, date: todayLocal(), description: '' },
   });
 
   const mutation = useRecordSupplierAdjustment();
@@ -138,7 +142,7 @@ function AdjustmentSection({ supplierId }: { supplierId: string }) {
         onSubmit={form.handleSubmit((v) =>
           mutation.mutate(
             { supplierId, data: v },
-            { onSuccess: () => form.reset({ type: 'credit', category: 'other', amount: undefined as unknown as number, date: todayLocal(), description: '' }) },
+            { onSuccess: () => form.reset({ type: 'credit', category: 'other', amount: 0, date: todayLocal(), description: '' }) },
           ),
         )}
         className="flex flex-col gap-4"
@@ -163,7 +167,7 @@ function AdjustmentSection({ supplierId }: { supplierId: string }) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="Amount" required error={form.formState.errors.amount?.message}>
-            <Input type="number" min={1} placeholder="₹ Amount" {...form.register('amount')} />
+            <Input type="number" min={1} step={0.01} {...form.register('amount', { valueAsNumber: true })} />
           </FormField>
           <FormField label="Date">
             <Input type="date" max={todayLocal()} {...form.register('date')} />
@@ -295,7 +299,7 @@ export default function SupplierDetailPage() {
                 location: supplier.location ?? '',
                 pincode: supplier.pincode ?? '',
                 joiningDate: supplier.joiningDate?.slice(0, 10) ?? '',
-                collectionSessions: (supplier.collectionSessions as ('morning' | 'evening')[]) ?? ['morning', 'evening'],
+                collectionSessions: (Array.isArray(supplier.collectionSessions) ? supplier.collectionSessions : ['morning']) as ('morning' | 'evening')[],
                 defaultMorningQty: supplier.defaultMorningQty,
                 defaultEveningQty: supplier.defaultEveningQty,
                 defaultRatePerLiter: supplier.defaultRatePerLiter,

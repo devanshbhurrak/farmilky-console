@@ -62,8 +62,13 @@ export function useSetSupplierStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => suppliersApi.setStatus(id, isActive),
-    onSuccess: (_data, variables) => {
-      toast.success(variables.isActive ? 'Supplier activated' : 'Supplier deactivated');
+    onSuccess: (data, variables) => {
+      // Handle warning from backend (e.g., when deactivating supplier with unsettled collections)
+      if (data && typeof data === 'object' && 'warning' in data) {
+        toast.warning((data as { warning: string }).warning);
+      } else {
+        toast.success(variables.isActive ? 'Supplier activated' : 'Supplier deactivated');
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(variables.id) });
     },

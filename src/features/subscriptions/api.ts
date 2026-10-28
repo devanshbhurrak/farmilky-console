@@ -5,10 +5,13 @@ import type { DeliveryHistoryEntry, Subscription, SubscriptionListParams } from 
 export interface PendingScheduleChange {
   effectiveDate?: string;
   deliverySchedule?: string;
+  customDays?: string[];
   quantityPerDelivery?: number;
   quantityPerDay?: number;
   scheduledQty?: number;
   scheduledPrice?: number;
+  scheduledDeliverySchedule?: string | null;
+  scheduledCustomDays?: string[] | null;
   deliverySlot?: string;
   slot?: string;
   status?: string;
@@ -91,7 +94,8 @@ export interface ScheduleChangeRequest {
   effectiveDate: string;
   scheduledQty?: number;
   scheduledPrice?: number;
-  deliverySchedule?: string;
+  deliverySchedule?: 'daily' | 'alternate' | 'weekly' | 'custom';
+  customDays?: string[];
   quantityPerDay?: number;
   slot?: string;
 }
@@ -109,6 +113,8 @@ export interface SubscriptionOutcomeRequest {
 export interface HistoryQuery {
   month?: string | number;
   year?: string | number;
+  page?: number;
+  limit?: number;
 }
 
 export const subscriptionsApi = {
@@ -168,8 +174,8 @@ export const subscriptionsApi = {
   },
   updateStatus: (id: string, status: string) =>
     api.put<ApiResponse<Subscription>>(`/api/subscriptions/admin/${id}/status`, { status }),
-  bulkPause: (ids: string[], extra?: { pauseFrom?: string; pauseUntil?: string }) =>
-    api.put<ApiResponse<unknown>>('/api/subscriptions/admin/bulk-pause', { subscriptionIds: ids, ...(extra ?? {}) }),
+  bulkPause: (ids: string[]) =>
+    api.put<ApiResponse<unknown>>('/api/subscriptions/admin/bulk-pause', { subscriptionIds: ids }),
   bulkResume: (ids: string[]) =>
     api.put<ApiResponse<unknown>>('/api/subscriptions/admin/bulk-resume', { subscriptionIds: ids }),
   scheduleChange: (id: string, data: ScheduleChangeRequest) => {
@@ -179,6 +185,8 @@ export const subscriptionsApi = {
     const qty = data.scheduledQty ?? data.quantityPerDay;
     if (qty !== undefined) payload.scheduledQty = qty;
     if (data.scheduledPrice !== undefined) payload.scheduledPrice = data.scheduledPrice;
+    if (data.deliverySchedule !== undefined) payload.deliverySchedule = data.deliverySchedule;
+    if (data.customDays !== undefined) payload.customDays = data.customDays;
     // Multi-slot subscriptions require a target slot for scheduledQty.
     if (data.slot !== undefined) payload.slot = data.slot;
     return api.put<ApiResponse<Subscription>>(`/api/subscriptions/admin/${id}/schedule-change`, payload);
@@ -195,6 +203,8 @@ export const subscriptionsApi = {
     api.get<unknown>(`/api/subscriptions/admin/${id}/history`, {
       month: params.month,
       year: params.year,
+      page: params.page,
+      limit: params.limit,
     }),
   productsLite: () => api.get<unknown>('/api/products', { limit: 100 }),
   customersLite: (search?: string) =>

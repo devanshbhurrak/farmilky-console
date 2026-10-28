@@ -30,6 +30,9 @@ export const dashboardApi = {
   deliveryBoard: (date: string, slot: string) =>
     safeGet<unknown>('/api/subscriptions/admin/delivery-board', { date, slot, limit: 1 }),
   todaySupply: () => safeGet<unknown>('/api/subscriptions/admin/today-supply'),
+  // Small catalog lookup used to label the load sheet (today-supply only
+  // carries productId, not the product name).
+  products: () => safeGet<unknown>('/api/products', { limit: 200 }),
   openWork: async (): Promise<
     DashboardResult<{ openComplaints: number; pendingReturns: number }>
   > => {

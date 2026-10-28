@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { Pagination } from './pagination';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export interface Column<T> {
@@ -105,13 +106,18 @@ export function DataTable<T>({
     );
   }
 
+  const visibleColumns = columns.filter((col) => !col.hideOnMobile);
+  const desktopColumns = columns;
+
   return (
     <div className={cn('flex flex-1 flex-col', className)}>
       {/* Mobile cards */}
       {renderCard && (
         <div className="flex flex-col gap-3 md:hidden">
           {data.map((item, i) => (
-            <div key={keyExtractor(item, i)}>{renderCard(item)}</div>
+            <Card key={keyExtractor(item, i)} className="p-4">
+              {renderCard(item)}
+            </Card>
           ))}
         </div>
       )}
@@ -126,7 +132,7 @@ export function DataTable<T>({
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              {columns.map((col) => (
+              {desktopColumns.map((col) => (
                 <th
                   key={col.header}
                   className="px-4 py-3 text-xs font-medium tracking-wide text-slate-500 uppercase"
@@ -139,7 +145,7 @@ export function DataTable<T>({
           <tbody>
             {data.map((item, i) => (
               <tr key={keyExtractor(item, i)} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/60">
-                {columns.map((col) => (
+                {desktopColumns.map((col) => (
                   <td key={col.header} className={cn('px-4 py-3 align-top text-slate-700', col.className)}>
                     {col.cell ? col.cell(item) : cellValue(item, col.accessor)}
                   </td>
@@ -151,7 +157,9 @@ export function DataTable<T>({
       </div>
 
       {page !== undefined && totalPages !== undefined && onPageChange && (
-        <Pagination page={page} totalPages={totalPages} total={total} onChange={onPageChange} className="mt-auto" />
+        <div className="mt-4 pt-4 border-t border-slate-100 md:mt-0 md:border-t-0 md:pt-0">
+          <Pagination page={page} totalPages={totalPages} total={total} onChange={onPageChange} />
+        </div>
       )}
     </div>
   );

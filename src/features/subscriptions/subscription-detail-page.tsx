@@ -192,12 +192,13 @@ export default function SubscriptionDetailPage() {
       </Card>
 
       <DeliveryHistory
+        key={id}
         subscriptionId={id as string}
         startMonth={subscription.startDate?.slice(0, 7)}
         slots={slotConfig}
       />
 
-      <ScheduleConfig subscription={subscription} />
+      <ScheduleConfig key={id} subscription={subscription} />
 
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
         <SheetContent side="bottom">

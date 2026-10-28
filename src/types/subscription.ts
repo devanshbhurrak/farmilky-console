@@ -30,6 +30,9 @@ export interface Subscription {
   scheduledChangeDate?: string | null;
   scheduledQty?: number | null;
   scheduledPrice?: number | null;
+  scheduledSlot?: DeliverySlot | null;
+  scheduledDeliverySchedule?: ScheduleType | null;
+  scheduledCustomDays?: string[] | null;
   createdAt: string;
   updatedAt?: string;
   // Backward compatibility aliases

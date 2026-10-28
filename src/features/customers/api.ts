@@ -16,7 +16,7 @@ type RawRecord = Record<string, unknown>;
 
 function toAddressArray(o: RawRecord): Customer['addresses'] {
   if (Array.isArray(o.addresses)) return o.addresses as Customer['addresses'];
-  if (o.address) return [o.address as Customer['addresses'][number]];
+  if (o.address) return [o.address] as Customer['addresses'];
   return undefined;
 }
 

@@ -14,6 +14,7 @@ export interface DeliveryBoardEntry {
   lng?: number | null;
   type: DeliveryBoardType | string;
   subscriptionId?: string | null;
+  deliverySlot?: 'morning' | 'evening' | null;
   orderId?: string | null;
   productId?: string | null;
   productName?: string | null;

@@ -2,20 +2,7 @@ import * as React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Users } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
-import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
-import { DataTable } from '@/components/data/data-table';
-import type { Column } from '@/components/data/data-table';
-import { FilterBar } from '@/components/data/filter-bar';
-import type { ActiveFilter } from '@/components/data/filter-bar';
-import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
-import { FormField } from '@/components/form/form-field';
-import { SearchInput } from '@/components/data/search-input';
-import { StatusBadge } from '@/components/data/status-badge';
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, formatDate, getErrorMessage, getId } from '@/lib/utils';
@@ -29,6 +16,8 @@ import { customerBalance, enrichCustomersArea } from './customer-utils';
 import type { CreateCustomerInput } from './schemas';
 import type { Area } from '@/types/area';
 import type { Customer } from '@/types/customer';
+import { ListView } from '@/components/data/list-view';
+import type { Column } from '@/components/data/data-table';
 
 function toAreaOptions(items: Area[]): AreaOption[] {
   return items.map((a) => ({ id: getId(a) || a.id, name: a.name }));
@@ -46,7 +35,39 @@ export default function CustomersPage() {
   const page = Number(params.get('page') ?? 1) || 1;
   const debouncedSearch = useDebounce(search, 400);
 
-  const filters = useFilterDrawer({ status, balance: balanceFilter, sort });
+  const filterConfig = {
+    fields: {
+      status: {
+        label: 'Status',
+        type: 'select' as const,
+        options: [
+          { value: 'all', label: 'All statuses' },
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ],
+      },
+      balance: {
+        label: 'Balance',
+        type: 'select' as const,
+        options: [
+          { value: 'all', label: 'Any balance' },
+          { value: 'due', label: 'Due' },
+          { value: 'clear', label: 'Clear' },
+        ],
+      },
+      sort: {
+        label: 'Sort by',
+        type: 'select' as const,
+        options: [
+          { value: 'newest', label: 'Newest first' },
+          { value: 'oldest', label: 'Oldest first' },
+          { value: 'name', label: 'Name A–Z' },
+          { value: 'highest-due', label: 'Highest due' },
+        ],
+      },
+    },
+    initialValues: { status: 'all', balance: 'all', sort: 'newest' },
+  };
 
   function update(next: Record<string, string>) {
     const sp = new URLSearchParams(params);
@@ -61,6 +82,10 @@ export default function CustomersPage() {
     page,
     limit: 20,
     search: debouncedSearch || undefined,
+    status: status !== 'all' ? status : undefined,
+    balance: balanceFilter !== 'all' ? balanceFilter : undefined,
+    sortBy: sort === 'newest' ? 'createdAt' : sort === 'oldest' ? 'createdAt' : sort === 'name' ? 'name' : 'accountBalance',
+    sortOrder: sort === 'newest' ? 'desc' : sort === 'oldest' ? 'asc' : sort === 'name' ? 'asc' : 'desc',
   });
   const createMutation = useCreateCustomer();
 
@@ -72,7 +97,6 @@ export default function CustomersPage() {
     ),
     [setCreateOpen]
   );
-  useRegisterHeaderAction(createAction);
 
   const { data: areasRes } = useQuery({
     queryKey: queryKeys.areas.list(),
@@ -80,7 +104,12 @@ export default function CustomersPage() {
   });
   const areas = React.useMemo(() => toAreaOptions(areasRes ?? []), [areasRes]);
 
-  const filtered = React.useMemo(() => {
+  const enriched = React.useMemo(() => enrichCustomersArea(data?.items ?? [], areas), [data?.items, areas]);
+
+  const activeFilters: { key: string; label: string; value: string }[] = [];
+  if (status !== 'all') activeFilters.push({ key: 'status', label: 'Status', value: status });
+  if (balanceFilter !== 'all') activeFilters.push({ key: 'balance', label: 'Balance', value: balanceFilter });
+  if (sort !== 'newest') activeFilters.push({ key: 'sort', label: 'Sort', value: sort });.useMemo(() => {
     let items = [...(data?.items ?? [])];
     if (status === 'active') items = items.filter((c) => c.isActive);
     if (status === 'inactive') items = items.filter((c) => !c.isActive);

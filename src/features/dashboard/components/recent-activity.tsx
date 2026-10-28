@@ -2,13 +2,36 @@ import { Repeat, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate, shortId } from '@/lib/utils';
-import type { DashboardStat } from '../types';
 
-export function RecentActivity({ stats, loading }: { stats: DashboardStat | null | undefined; loading?: boolean }) {
+/** Subset of an order the panel renders (from GET /api/orders/admin/all). */
+interface RecentOrder {
+  id?: string;
+  customerName?: string;
+  totalAmount?: number;
+  createdAt?: string | null;
+}
+
+/** Subset of a subscription the panel renders (from the admin list endpoint). */
+interface RecentSubscription {
+  id?: string;
+  customerName?: string;
+  status?: string | null;
+  createdAt?: string | null;
+}
+
+export function RecentActivity({
+  orders,
+  subscriptions,
+  loading,
+}: {
+  orders?: RecentOrder[] | null;
+  subscriptions?: RecentSubscription[] | null;
+  loading?: boolean;
+}) {
   if (loading) return <Skeleton className="h-44 w-full" />;
-  const orders = stats?.recentOrders ?? [];
-  const subs = stats?.recentSubscriptions ?? [];
-  if (orders.length === 0 && subs.length === 0) {
+  const orderList = orders ?? [];
+  const subList = subscriptions ?? [];
+  if (orderList.length === 0 && subList.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-2">
@@ -26,15 +49,15 @@ export function RecentActivity({ stats, loading }: { stats: DashboardStat | null
         <CardTitle className="text-sm">Recent activity</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {orders.length > 0 && (
+        {orderList.length > 0 && (
           <p className="mb-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Orders</p>
         )}
-        {orders.slice(0, 5).map((o) => (
-          <div key={String(o.id)} className="flex items-center justify-between gap-2 text-sm">
+        {orderList.slice(0, 5).map((o, i) => (
+          <div key={String(o.id ?? i)} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex min-w-0 items-center gap-2 text-slate-700">
               <ShoppingCart className="size-3.5 shrink-0 text-blue-500" />
               <span className="truncate">
-                Order {shortId(String(o.id))} · {o.customerName ?? '—'}
+                Order {o.id ? shortId(String(o.id)) : '—'} · {o.customerName ?? '—'}
               </span>
             </span>
             <span className="text-xs text-slate-500">
@@ -42,16 +65,16 @@ export function RecentActivity({ stats, loading }: { stats: DashboardStat | null
             </span>
           </div>
         ))}
-        {orders.length > 0 && subs.length > 0 && <div className="my-2 h-px bg-slate-100" />}
-        {subs.length > 0 && (
+        {orderList.length > 0 && subList.length > 0 && <div className="my-2 h-px bg-slate-100" />}
+        {subList.length > 0 && (
           <p className="mb-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Subscriptions</p>
         )}
-        {subs.slice(0, 5).map((s) => (
-          <div key={String(s.id)} className="flex items-center justify-between gap-2 text-sm">
+        {subList.slice(0, 5).map((s, i) => (
+          <div key={String(s.id ?? i)} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex min-w-0 items-center gap-2 text-slate-700">
               <Repeat className="size-3.5 shrink-0 text-violet-500" />
               <span className="truncate">
-                Subscription {shortId(String(s.id))} · {s.customerName ?? '—'}
+                Subscription {s.id ? shortId(String(s.id)) : '—'} · {s.customerName ?? '—'}
               </span>
             </span>
             <span className="text-xs text-slate-500">

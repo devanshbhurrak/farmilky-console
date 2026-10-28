@@ -60,7 +60,7 @@ export function OutcomeSheet({
         <div className="mt-4">
           <OutcomeForm
             kind={kind}
-            defaultValues={{ deliveryDate: date }}
+            defaultValues={{ deliveryDate: date, slot: entry?.deliverySlot ?? undefined }}
             onSubmit={handleSubmit}
             submitting={recordOutcome.isPending}
           />

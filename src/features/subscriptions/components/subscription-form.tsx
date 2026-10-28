@@ -12,7 +12,7 @@ import { FormField } from '@/components/form/form-field';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useDebounce } from '@/hooks/use-debounce';
 import { queryKeys } from '@/lib/query-keys';
-import { formatCurrency, getId, getName, normalizeList } from '@/lib/utils';
+import { formatCurrency, getErrorMessage, getId, getName, normalizeList } from '@/lib/utils';
 import { WEEK_DAYS } from '@/types/subscription';
 import { subscriptionsApi } from '../api';
 import { subscriptionSchema } from '../schemas';
@@ -94,6 +94,7 @@ export function SubscriptionForm({
       const res = await subscriptionsApi.customersLite(debouncedCustomerSearch);
       return normalizeList<LiteCustomer>(res, ['users', 'customers']).items;
     },
+    enabled: !fixedCustomerId,
     placeholderData: keepPreviousData,
   });
 
@@ -195,7 +196,7 @@ export function SubscriptionForm({
       setValue('variantId', variantIdOf(dv, idx));
       setValue('customPrice', variantPrice(dv), { shouldValidate: true });
     } else if (next) {
-      setValue('variantId', undefined as unknown as string);
+      setValue('variantId', undefined);
       setValue('customPrice', Number(next.basePrice ?? next.price ?? 0), { shouldValidate: true });
     }
   };
@@ -267,7 +268,14 @@ export function SubscriptionForm({
       className="flex flex-col gap-4"
     >
       {!fixedCustomerId && (
-        <FormField label="Customer" required error={errors.userId?.message}>
+        <FormField
+          label="Customer"
+          required
+          error={
+            errors.userId?.message ??
+            (customersQuery.isError ? getErrorMessage(customersQuery.error) : undefined)
+          }
+        >
           <SearchableSelect
             options={customers.map((c) => {
               const name = getName(c);
@@ -284,9 +292,17 @@ export function SubscriptionForm({
         </FormField>
       )}
 
-      <FormField label="Product" required error={errors.productId?.message} hint={unitHint ? `Unit: ${unitHint}` : undefined}>
+      <FormField
+        label="Product"
+        required
+        error={
+          errors.productId?.message ??
+          (productsQuery.isError ? getErrorMessage(productsQuery.error) : undefined)
+        }
+        hint={unitHint ? `Unit: ${unitHint}` : undefined}
+      >
         <Select aria-label="Product" value={productId} onChange={(e) => handleProductChange(e.target.value)}>
-          <option value="">Select product</option>
+          <option value="">{productsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
           {products.map((p) => (
             <option key={getId(p)} value={getId(p)}>
               {getName(p)} · {formatCurrency(p.basePrice ?? p.price ?? 0)}
@@ -336,8 +352,8 @@ export function SubscriptionForm({
               >
                 <Input
                   type="number"
-                  min={1}
-                  step="any"
+                  min={0.001}
+                  step={0.001}
                   value={slotQuantities[slot] ?? ''}
                   onChange={(e) => setSlotQuantity(slot, e.target.value)}
                 />
@@ -346,7 +362,7 @@ export function SubscriptionForm({
           </>
         ) : (
           <FormField label="Qty / delivery" required error={errors.quantityPerDelivery?.message}>
-            <Input type="number" min={1} step="any" {...register('quantityPerDelivery')} />
+            <Input type="number" min={0.001} step={0.001} {...register('quantityPerDelivery')} />
           </FormField>
         )}
         <FormField
@@ -355,7 +371,7 @@ export function SubscriptionForm({
           hint={selectedProduct ? `Default ${formatCurrency(defaultPrice)}` : undefined}
         >
           <div className="flex items-center gap-2">
-            <Input type="number" min={0} step="any" {...register('customPrice')} />
+            <Input type="number" min={0.01} step={0.01} {...register('customPrice')} />
             {selectedProduct && isCustomPrice && <Badge variant="warning">CUSTOM</Badge>}
           </div>
         </FormField>
@@ -411,7 +427,12 @@ export function SubscriptionForm({
       </div>
 
       {schedule === 'custom' && (
-        <FormField label="Custom days" hint="Select delivery days">
+        <FormField
+          label="Custom days"
+          required
+          error={errors.customDays?.message}
+          hint="Select at least one delivery day"
+        >
           <div className="flex flex-wrap gap-2">
             {WEEK_DAYS.map((day) => (
               <label

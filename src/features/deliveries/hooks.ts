@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { getErrorMessage, normalizeList } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/utils';
 import type { DeliveryBoardEntry } from '@/types/delivery';
 import { deliveriesApi } from './api';
 import type { DeliveryBoardParams } from './api';
@@ -16,29 +16,29 @@ export interface DeliveryBoardData {
 
 function toBoardData(response: unknown): DeliveryBoardData {
   const root =
-    response && typeof response === 'object'
-      ? (response as Record<string, unknown>)
-      : ({} as Record<string, unknown>);
-  const { items } = normalizeList<DeliveryBoardEntry>(response, ['entries']);
-  const rawSummary = (root.summary ?? root.meta ?? {}) as Record<string, unknown>;
-  const total = Number(rawSummary.total ?? items.length ?? 0);
-  const delivered = Number(rawSummary.delivered ?? 0);
-  const pending =
-    Number(rawSummary.pending ?? rawSummary.remainingDeliveries ?? Math.max(total - delivered, 0)) || 0;
+    response && typeof response === 'object' && 'data' in response
+      ? (response as { data: unknown }).data
+      : response;
+  if (!root || typeof root !== 'object') {
+    return { entries: [], summary: { total: 0, remainingDeliveries: 0, delivered: 0, pending: 0 } };
+  }
+  const data = root as Record<string, unknown>;
+  const entries = Array.isArray(data.entries) ? (data.entries as DeliveryBoardEntry[]) : [];
+  const summary = data.summary as DeliveryBoardData['summary'] | undefined;
   return {
-    entries: items,
-    summary: {
-      total,
-      remainingDeliveries: Number(rawSummary.remainingDeliveries ?? pending),
-      delivered,
-      pending,
+    entries,
+    summary: summary ?? {
+      total: entries.length,
+      remainingDeliveries: entries.filter((e) => e.canRecordOutcome).length,
+      delivered: entries.filter((e) => e.deliveryStatus === 'delivered').length,
+      pending: entries.filter((e) => e.deliveryStatus === 'pending').length,
     },
   };
 }
 
 export function useDeliveryBoard(params: DeliveryBoardParams) {
   return useQuery({
-    queryKey: [...queryKeys.subscriptions.deliveryBoard(params.date ?? '', params.slot ?? ''), { ...params }],
+    queryKey: queryKeys.subscriptions.deliveryBoard(params.date ?? '', params.slot ?? ''),
     queryFn: async (): Promise<DeliveryBoardData> => {
       const res = await deliveriesApi.board(params);
       return toBoardData(res);

@@ -3,21 +3,25 @@ import { z } from 'zod';
 export const outcomeSchema = z
   .object({
     status: z.enum(['delivered', 'partial', 'extra', 'failed', 'skipped']),
-    actualQuantity: z.coerce.number().min(0).optional(),
-    reason: z.string().optional(),
-    notes: z.string().optional(),
+    actualQuantity: z.preprocess(
+      (value) => (value === '' || value === undefined ? undefined : value),
+      z.coerce.number().positive('Quantity must be greater than zero').optional(),
+    ),
+    reason: z.string().max(500).optional(),
+    notes: z.string().max(1000).optional(),
+    slot: z.enum(['morning', 'evening']).optional(),
     // Backend subscription delivery-outcome requires deliveryDate (YYYY-MM-DD).
-    deliveryDate: z.string().optional(),
+    deliveryDate: z.string().min(1, 'Delivery date is required'),
   })
   .superRefine((values, ctx) => {
-    if ((values.status === 'partial' || values.status === 'extra') && values.actualQuantity == null) {
+    if ((values.status === 'partial' || values.status === 'extra') && values.actualQuantity === undefined) {
       ctx.addIssue({
         code: 'custom',
         path: ['actualQuantity'],
         message: 'Actual quantity is required for partial / extra outcomes',
       });
     }
-    if ((values.status === 'failed' || values.status === 'skipped') && !values.reason) {
+    if ((values.status === 'failed' || values.status === 'skipped') && !values.reason?.trim()) {
       ctx.addIssue({
         code: 'custom',
         path: ['reason'],

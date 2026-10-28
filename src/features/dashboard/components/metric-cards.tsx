@@ -8,32 +8,37 @@ function num(v: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/**
+ * /api/admin/stats returns snake_case keys (see backend StatsRow). CamelCase
+ * aliases are kept as fallbacks so the cards still render if the payload is
+ * normalised upstream.
+ */
 export function MetricCards({
   stats,
   pendingDeliveries,
 }: {
   stats: DashboardStat | null | undefined;
-  boardSummary?: { remainingDeliveries: number } | null;
-  supplyRows?: unknown[];
   pendingDeliveries?: number;
 }) {
   const s = stats ?? {};
   const cards = [
     {
       label: 'Revenue booked',
-      value: formatCurrency(num(s.revenueBooked ?? s.revenue ?? s.totalRevenue)),
+      value: formatCurrency(num(s.total_revenue ?? s.revenueBooked ?? s.revenue ?? s.totalRevenue)),
       icon: <IndianRupee className="size-4" />,
       iconClassName: 'bg-emerald-50 text-emerald-600',
     },
     {
-      label: "Today's orders",
-      value: formatNumber(num(s.todayOrders ?? s.ordersToday ?? s.orders)),
+      // The stats endpoint only exposes the all-time order count — there is no
+      // orders-created-today metric, so the label matches the value shown.
+      label: 'Total orders',
+      value: formatNumber(num(s.total_orders ?? s.todayOrders ?? s.ordersToday ?? s.orders)),
       icon: <ShoppingCart className="size-4" />,
       iconClassName: 'bg-blue-50 text-blue-600',
     },
     {
       label: 'Active subs',
-      value: formatNumber(num(s.activeSubscriptions ?? s.activeSubs ?? s.subscriptions)),
+      value: formatNumber(num(s.active_subscriptions ?? s.activeSubscriptions ?? s.activeSubs ?? s.subscriptions)),
       icon: <Repeat className="size-4" />,
       iconClassName: 'bg-violet-50 text-violet-600',
     },
@@ -44,14 +49,16 @@ export function MetricCards({
       iconClassName: 'bg-amber-50 text-amber-600',
     },
     {
+      // pending_amount is the outstanding COD balance (rupees);
+      // pending_payments is only the number of customers owing it.
       label: 'Pending COD',
-      value: formatCurrency(num(s.pendingCod ?? s.codPending ?? s.pendingCOD)),
+      value: formatCurrency(num(s.pending_amount ?? s.pendingCod ?? s.codPending ?? s.pendingCOD)),
       icon: <Wallet className="size-4" />,
       iconClassName: 'bg-red-50 text-red-600',
     },
     {
       label: 'Total customers',
-      value: formatNumber(num(s.totalCustomers ?? s.customers ?? s.totalUsers)),
+      value: formatNumber(num(s.total_customers ?? s.totalCustomers ?? s.customers ?? s.totalUsers)),
       icon: <Users className="size-4" />,
       iconClassName: 'bg-slate-100 text-slate-600',
     },

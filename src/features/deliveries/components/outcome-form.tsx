@@ -24,11 +24,13 @@ export function OutcomeForm({
   const isOrder = kind === 'order';
   const form = useForm<DeliveryOutcomeInput>({
     resolver: zodResolver(outcomeSchema) as unknown as Resolver<DeliveryOutcomeInput>,
+    shouldUnregister: true,
     defaultValues: {
       status: defaultValues?.status ?? 'delivered',
       actualQuantity: defaultValues?.actualQuantity,
       reason: defaultValues?.reason ?? '',
       notes: defaultValues?.notes ?? '',
+      slot: defaultValues?.slot,
       deliveryDate: defaultValues?.deliveryDate ?? todayLocal(),
     },
   });
@@ -40,6 +42,7 @@ export function OutcomeForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <input type="hidden" {...register('slot')} />
       <FormField label="Status" required error={formState.errors.status?.message}>
         <Select {...register('status')}>
           <option value="delivered">Delivered</option>
@@ -53,14 +56,14 @@ export function OutcomeForm({
           <option value="skipped">Skipped</option>
         </Select>
       </FormField>
-      {isOrder ? null : (
+      {needsQty && (
         <FormField
           label="Actual quantity"
-          required={needsQty}
+          required
           error={formState.errors.actualQuantity?.message}
-          hint={needsQty ? 'Required for partial / extra' : undefined}
+          hint="Required for partial / extra"
         >
-          <Input type="number" min={0} step="any" {...register('actualQuantity')} />
+          <Input type="number" min={0.001} step="any" {...register('actualQuantity')} />
         </FormField>
       )}
       <FormField
@@ -76,7 +79,7 @@ export function OutcomeForm({
       </FormField>
       {isOrder ? null : (
         <FormField label="Delivery date" required error={formState.errors.deliveryDate?.message}>
-          <Input type="date" {...register('deliveryDate')} />
+          <Input type="date" max={todayLocal()} {...register('deliveryDate')} />
         </FormField>
       )}
       <Button type="submit" loading={submitting} className="min-h-11">

@@ -182,7 +182,13 @@ export const suppliersApi = {
     }
   },
 
-  async collectionTotal(supplierId: string, from?: string, to?: string): Promise<{ total: number }> {
+  async collectionTotal(supplierId: string, from?: string, to?: string): Promise<{
+    collectionTotal: number;
+    collectionCount: number;
+    adjustmentNet: number;
+    grandTotal: number;
+    adjustmentCount: number;
+  }> {
     try {
       const res = await api.get<RawRecord | number>('/api/supplier-payments/collection-total', {
         supplierId,
@@ -190,15 +196,23 @@ export const suppliersApi = {
         endDate: to || undefined,
       });
       const data = unwrapData<RawRecord | number>(res);
-      if (typeof data === 'number') return { total: data };
+      if (typeof data === 'number') return { collectionTotal: data, collectionCount: 0, adjustmentNet: 0, grandTotal: data, adjustmentCount: 0 };
       if (data && typeof data === 'object') {
-        const total = data.total ?? data.amount ?? data.collectionTotal;
-        if (typeof total === 'number') return { total };
-        if (typeof total === 'string' && !Number.isNaN(Number(total))) return { total: Number(total) };
+        const collectionTotal = typeof data.collectionTotal === 'number' ? data.collectionTotal : 
+          typeof data.total === 'number' ? data.total : 
+          typeof data.amount === 'number' ? data.amount : 0;
+        const grandTotal = typeof data.grandTotal === 'number' ? data.grandTotal : collectionTotal;
+        return {
+          collectionTotal,
+          collectionCount: typeof data.collectionCount === 'number' ? data.collectionCount : 0,
+          adjustmentNet: typeof data.adjustmentNet === 'number' ? data.adjustmentNet : 0,
+          grandTotal,
+          adjustmentCount: typeof data.adjustmentCount === 'number' ? data.adjustmentCount : 0,
+        };
       }
-      return { total: 0 };
+      return { collectionTotal: 0, collectionCount: 0, adjustmentNet: 0, grandTotal: 0, adjustmentCount: 0 };
     } catch {
-      return { total: 0 };
+      return { collectionTotal: 0, collectionCount: 0, adjustmentNet: 0, grandTotal: 0, adjustmentCount: 0 };
     }
   },
 

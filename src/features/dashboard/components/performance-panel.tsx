@@ -11,12 +11,15 @@ function extractRows(res: unknown, keys: string[]): PerformanceRow[] {
   for (const key of keys) {
     const val = obj[key];
     if (Array.isArray(val)) {
+      // /api/admin/delivery-performance returns snake_case rows
+      // ({ agent_name, area_name, total_entries, delivered, success_rate });
+      // camelCase aliases are kept for payloads that are already normalised.
       return (val as Record<string, unknown>[]).map((r) => ({
         id: r.id != null ? String(r.id) : undefined,
-        name: String(r.name ?? r.agentName ?? r.areaName ?? '—'),
+        name: String(r.name ?? r.agent_name ?? r.agentName ?? r.area_name ?? r.areaName ?? '—'),
         delivered: Number(r.delivered ?? 0) || 0,
-        total: Number(r.total ?? r.assigned ?? r.delivered ?? 0) || 0,
-        successRate: Number(r.successRate ?? r.rate ?? 0) || 0,
+        total: Number(r.total ?? r.total_entries ?? r.totalEntries ?? r.assigned ?? r.delivered ?? 0) || 0,
+        successRate: Number(r.successRate ?? r.success_rate ?? r.rate ?? 0) || 0,
       }));
     }
   }

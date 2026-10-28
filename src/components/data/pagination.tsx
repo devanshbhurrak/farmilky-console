@@ -16,20 +16,36 @@ export function Pagination({ page, totalPages, total, onChange, className }: Pag
   const pages = visiblePages(page, totalPages);
   return (
     <div className={cn('flex flex-col items-center gap-2 py-4 sm:flex-row sm:justify-between', className)}>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 text-center sm:text-left w-full sm:w-auto">
         Page {page} of {Math.max(totalPages, 1)}
         {typeof total === 'number' ? ` · ${total} result${total === 1 ? '' : 's'}` : ''}
       </p>
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" aria-label="First page" disabled={page <= 1} onClick={() => onChange(1)}>
+      <div className="flex items-center gap-1 flex-wrap justify-center">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="First page"
+          disabled={page <= 1}
+          onClick={() => onChange(1)}
+          className="min-h-10 min-w-10"
+        >
           <ChevronsLeft />
         </Button>
-        <Button variant="outline" size="icon" aria-label="Previous page" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Previous page"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          className="min-h-10 min-w-10"
+        >
           <ChevronLeft />
         </Button>
         {pages.map((p, i) =>
           p === '…' ? (
-            <span key={`ellipsis-${i}`} className="px-1 text-sm text-slate-400">…</span>
+            <span key={`ellipsis-${i}`} className="px-2 text-sm text-slate-400 flex items-center min-h-10">
+              …
+            </span>
           ) : (
             <Button
               key={p}
@@ -38,15 +54,30 @@ export function Pagination({ page, totalPages, total, onChange, className }: Pag
               aria-label={`Page ${p}`}
               aria-current={p === page ? 'page' : undefined}
               onClick={() => onChange(p as number)}
+              className="min-h-10 min-w-10"
             >
               {p}
             </Button>
           ),
         )}
-        <Button variant="outline" size="icon" aria-label="Next page" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Next page"
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          className="min-h-10 min-w-10"
+        >
           <ChevronRight />
         </Button>
-        <Button variant="outline" size="icon" aria-label="Last page" disabled={page >= totalPages} onClick={() => onChange(totalPages)}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Last page"
+          disabled={page >= totalPages}
+          onClick={() => onChange(totalPages)}
+          className="min-h-10 min-w-10"
+        >
           <ChevronsRight />
         </Button>
       </div>

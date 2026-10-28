@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -70,18 +70,28 @@ export function FilterDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[88dvh]">
         <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-slate-200" aria-hidden />
-        <SheetHeader className="border-b-0 pb-2">
-          <SheetTitle>{title}</SheetTitle>
-          {description ? (
-            <SheetDescription>{description}</SheetDescription>
-          ) : activeCount > 0 ? (
-            <SheetDescription>
-              {activeCount} active filter{activeCount > 1 ? 's' : ''}
-            </SheetDescription>
-          ) : null}
+        <SheetHeader className="border-b border-slate-200 pb-2 flex items-center justify-between">
+          <div>
+            <SheetTitle>{title}</SheetTitle>
+            {description ? (
+              <SheetDescription>{description}</SheetDescription>
+            ) : activeCount > 0 ? (
+              <SheetDescription>
+                {activeCount} active filter{activeCount > 1 ? 's' : ''}
+              </SheetDescription>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close filters"
+            className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
+          >
+            <X className="size-5" />
+          </button>
         </SheetHeader>
-        <SheetBody className="flex flex-col gap-4 pt-0">{children}</SheetBody>
-        <SheetFooter className="flex flex-row items-center gap-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <SheetBody className="flex flex-col gap-4 pt-2 overflow-y-auto max-h-[60vh] pb-20">{children}</SheetBody>
+        <SheetFooter className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-t-0 md:bg-transparent md:p-0 flex flex-row items-center gap-2">
           <Button type="button" variant="outline" onClick={onReset} className="min-h-12 flex-1">
             Reset
           </Button>

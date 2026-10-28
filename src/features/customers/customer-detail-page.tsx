@@ -512,7 +512,7 @@ export default function CustomerDetailPage() {
                 name: customer.name,
                 email: customer.email ?? '',
                 phone: customer.phone ?? '',
-                role: customer.role,
+                role: customer.role as "admin" | "delivery" | "delivery_partner" | "agent" | "customer" | "supplier",
                 isActive: customer.isActive,
                 address: {
                   street: customer.addresses?.[0]?.street ?? customer.addresses?.[0]?.line1 ?? '',
