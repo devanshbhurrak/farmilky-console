@@ -34,29 +34,44 @@ export function DeliveryDetailsDrawer({
   const [session, setSession] = useState<'morning' | 'evening' | null>(entry.deliverySlot ?? null);
   const serverItems = deliveryQuery.data?.items ?? [];
   const [items, setItems] = useState<DeliveryItemOutcome[]>(() => {
-    const fromEntry = (entry.items ?? []).map((it) => ({
-      productId: it.productId,
-      variantId: it.variantId ?? undefined,
-      productName: it.productName,
-      variantLabel: it.variantLabel ?? undefined,
-      unit: it.unit ?? undefined,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice ?? 0,
-      deliveredQuantity: Number(it.itemStatus === 'pending' ? (it.deliveredQuantity ?? it.quantity ?? 0) : (it.deliveredQuantity ?? 0)),
-      itemStatus: it.itemStatus,
-      failureReason: it.failureReason ?? undefined,
-      failureNotes: it.failureNotes ?? undefined,
-    }));
+    const fromEntry = (entry.items ?? []).map((it) => {
+      const scheduledQty = Number(it.quantity ?? 0);
+      const isPending = it.itemStatus === 'pending' || entry.deliveryStatus === 'pending';
+      const deliveredQty = isPending
+        ? (it.deliveredQuantity && it.deliveredQuantity > 0 ? Number(it.deliveredQuantity) : scheduledQty)
+        : Number(it.deliveredQuantity ?? 0);
+
+      return {
+        productId: it.productId,
+        variantId: it.variantId ?? undefined,
+        productName: it.productName,
+        variantLabel: it.variantLabel ?? undefined,
+        unit: it.unit ?? undefined,
+        quantity: scheduledQty,
+        unitPrice: it.unitPrice ?? 0,
+        deliveredQuantity: deliveredQty,
+        itemStatus: it.itemStatus,
+        failureReason: it.failureReason ?? undefined,
+        failureNotes: it.failureNotes ?? undefined,
+      };
+    });
     if (fromEntry.length > 0) return fromEntry;
+
+    const defaultQty = Number(entry.scheduledQuantity ?? entry.quantity ?? 0);
+    const isPending = entry.deliveryStatus === 'pending';
+    const deliveredQty = isPending
+      ? defaultQty
+      : Number(entry.actualQuantity ?? 0);
+
     return [{
       productId: entry.productId ?? entry.id,
       variantId: undefined,
       productName: entry.productName ?? 'Delivery',
       variantLabel: undefined,
       unit: entry.unit ?? undefined,
-      quantity: Number(entry.scheduledQuantity ?? entry.quantity ?? 0),
+      quantity: defaultQty,
       unitPrice: Number(entry.pricePerPacket ?? 0),
-      deliveredQuantity: Number(entry.scheduledQuantity ?? entry.quantity ?? 0),
+      deliveredQuantity: deliveredQty,
       itemStatus: entry.deliveryStatus as DeliveryBoardStatus,
       failureReason: undefined,
       failureNotes: undefined,
@@ -77,19 +92,27 @@ export function DeliveryDetailsDrawer({
   useEffect(() => {
     if (serverItems.length > 0) {
       setItems(
-        serverItems.map((it: any) => ({
-          productId: it.productId,
-          variantId: it.variantId ?? undefined,
-          productName: it.productName,
-          variantLabel: it.variantLabel ?? undefined,
-          unit: it.unit ?? undefined,
-          quantity: Number(it.quantity),
-          unitPrice: Number(it.unitPrice ?? 0),
-          deliveredQuantity: Number(it.itemStatus === 'pending' ? (it.deliveredQuantity ?? it.quantity ?? 0) : (it.deliveredQuantity ?? 0)),
-          itemStatus: it.itemStatus,
-          failureReason: it.failureReason ?? undefined,
-          failureNotes: it.failureNotes ?? undefined,
-        })),
+        serverItems.map((it: any) => {
+          const scheduledQty = Number(it.quantity ?? 0);
+          const isPending = it.itemStatus === 'pending' || entry.deliveryStatus === 'pending';
+          const deliveredQty = isPending
+            ? (Number(it.deliveredQuantity) > 0 ? Number(it.deliveredQuantity) : scheduledQty)
+            : Number(it.deliveredQuantity ?? 0);
+
+          return {
+            productId: it.productId,
+            variantId: it.variantId ?? undefined,
+            productName: it.productName,
+            variantLabel: it.variantLabel ?? undefined,
+            unit: it.unit ?? undefined,
+            quantity: scheduledQty,
+            unitPrice: Number(it.unitPrice ?? 0),
+            deliveredQuantity: deliveredQty,
+            itemStatus: it.itemStatus,
+            failureReason: it.failureReason ?? undefined,
+            failureNotes: it.failureNotes ?? undefined,
+          };
+        }),
       );
     }
   }, [serverItems]);
