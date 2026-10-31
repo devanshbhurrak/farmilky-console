@@ -16,4 +16,4 @@ run_worker_first = ["/api/*"]
 # The referenced service (farmilky-api) must be deployed to the same account.
 [[services]]
 binding = "BACKEND"
-service = "farmilky-api"
+service = "farmilky-engine"
