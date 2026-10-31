@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const outcomeSchema = z
   .object({
-    status: z.enum(['delivered', 'partial', 'extra', 'failed', 'skipped']),
+    status: z.enum(['delivered', 'partial', 'extra', 'failed', 'skipped', 'missed']),
     actualQuantity: z.preprocess(
       (value) => (value === '' || value === undefined ? undefined : value),
       z.coerce.number().positive('Quantity must be greater than zero').optional(),
@@ -10,8 +10,8 @@ export const outcomeSchema = z
     reason: z.string().max(500).optional(),
     notes: z.string().max(1000).optional(),
     slot: z.enum(['morning', 'evening']).optional(),
-    // Backend subscription delivery-outcome requires deliveryDate (YYYY-MM-DD).
     deliveryDate: z.string().min(1, 'Delivery date is required'),
+    paymentMode: z.enum(['pay_at_delivery', 'subscription_ledger', 'prepaid']).optional(),
   })
   .superRefine((values, ctx) => {
     if ((values.status === 'partial' || values.status === 'extra') && values.actualQuantity === undefined) {
@@ -21,11 +21,14 @@ export const outcomeSchema = z
         message: 'Actual quantity is required for partial / extra outcomes',
       });
     }
-    if ((values.status === 'failed' || values.status === 'skipped') && !values.reason?.trim()) {
+    if (
+      (values.status === 'failed' || values.status === 'skipped' || values.status === 'missed') &&
+      !values.reason?.trim()
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['reason'],
-        message: 'Reason is required for failed / skipped outcomes',
+        message: 'Reason is required for failed / skipped / missed outcomes',
       });
     }
   });

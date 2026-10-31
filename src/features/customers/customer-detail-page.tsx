@@ -180,7 +180,7 @@ function QuickOrderDialog({ userId, open, onOpenChange }: { userId: string; open
         '/api/orders/admin/create',
         {
           userId,
-          items: [{ productId: values.productId, quantity: values.quantity, price: product?.price ?? 0 }],
+          items: [{ productId: values.productId, quantity: values.quantity, price: product?.basePrice ?? product?.price ?? 0 }],
           paymentMethod: 'COD',
         },
         { idempotent: true },
@@ -208,7 +208,7 @@ function QuickOrderDialog({ userId, open, onOpenChange }: { userId: string; open
                 <option value="">Select product</option>
                 {products.map((p) => (
                   <option key={getId(p) || p.id} value={getId(p) || p.id}>
-                    {p.name} · {formatCurrency(p.price)}
+                    {p.name} · {formatCurrency(p.basePrice ?? p.price ?? 0)}
                   </option>
                 ))}
               </Select>

@@ -7,6 +7,7 @@ function emptyToUndefined(value: unknown): unknown {
 }
 
 export const productVariantSchema = z.object({
+  id: z.string().uuid().optional(),
   label: z.string().trim().min(1, 'Label is required'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   unit: z.enum(PRODUCT_UNITS, { message: 'Unit is required' }),

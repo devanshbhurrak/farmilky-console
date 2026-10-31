@@ -7,7 +7,7 @@ import { useCustomerSubscriptions } from '../hooks';
 import type { Subscription } from '@/types/subscription';
 
 function productName(s: Subscription): string {
-  return s.productName ?? getName(s.productId);
+  return getName(s.productId, s.productName ?? '—');
 }
 
 function dailyValue(s: Subscription): number {

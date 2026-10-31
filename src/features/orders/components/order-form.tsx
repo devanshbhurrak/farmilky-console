@@ -79,7 +79,7 @@ export function OrderForm({
       productId: pid,
       variantId: defaultVariant ? variantKey(defaultVariant, product.variants?.indexOf(defaultVariant) ?? 0) : undefined,
       quantity: 1,
-      price: defaultVariant ? effectivePrice(defaultVariant) : Number(product.price ?? 0),
+      price: defaultVariant ? effectivePrice(defaultVariant) : Number(product.basePrice ?? product.price ?? 0),
     });
     setProductPick('');
   }
@@ -147,7 +147,7 @@ export function OrderForm({
               <option value="">Select product</option>
               {(products ?? []).map((p) => (
                 <option key={getId(p) || p.id} value={getId(p) || p.id}>
-                  {p.name} · {formatCurrency(p.price)}
+                  {p.name} · {formatCurrency(p.basePrice ?? p.price ?? 0)}
                 </option>
               ))}
             </Select>

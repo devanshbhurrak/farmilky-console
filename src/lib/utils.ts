@@ -91,12 +91,12 @@ export function getId(item: unknown): string {
 /** Display name for either a populated object `{ name }` or a raw string id. */
 export function getName(ref: unknown, fallback = '—'): string {
   if (!ref) return fallback;
-  if (typeof ref === 'string') return ref;
   if (typeof ref === 'object') {
     const o = ref as Record<string, unknown>;
     const n = o.name ?? o.title ?? o.label;
     if (typeof n === 'string' && n) return n;
   }
+  // If ref is a string (raw ID) or object without name, use fallback
   return fallback;
 }
 

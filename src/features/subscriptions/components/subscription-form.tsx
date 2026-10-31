@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { FormField } from '@/components/form/form-field';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useDebounce } from '@/hooks/use-debounce';
 import { queryKeys } from '@/lib/query-keys';
-import { formatCurrency, getErrorMessage, getId, getName, normalizeList } from '@/lib/utils';
+import { formatCurrency, getId, getName, normalizeList, todayLocal } from '@/lib/utils';
 import { WEEK_DAYS } from '@/types/subscription';
 import { subscriptionsApi } from '../api';
 import { subscriptionSchema } from '../schemas';
@@ -68,8 +67,6 @@ export function SubscriptionForm({
     quantityPerDay?: number;
     pricePerUnit?: number;
     slot?: 'morning' | 'evening';
-    // Per-slot config rows from the backend detail endpoint. Named differently
-    // from the form's `slots` field (which holds slot names) to avoid a clash.
     slotRows?: Array<{ deliverySlot?: string; quantityPerDelivery?: string | number }>;
   };
   onSubmit: (values: SubscriptionInput) => void;
@@ -98,8 +95,6 @@ export function SubscriptionForm({
     placeholderData: keepPreviousData,
   });
 
-  // Derive the initial slot configuration: prefer explicit per-slot rows from
-  // the backend, then the legacy single-slot fields.
   const initialSlots = (() => {
     const rows = defaultValues?.slotRows ?? [];
     if (rows.length > 0) {
@@ -135,9 +130,8 @@ export function SubscriptionForm({
       productId: defaultValues?.productId ?? '',
       variantId: defaultValues?.variantId ?? undefined,
       quantityPerDelivery: initialSlots.primaryQty,
-      customPrice:
-        defaultValues?.customPrice ?? defaultValues?.pricePerUnit ?? 0,
-      startDate: defaultValues?.startDate ?? '',
+      customPrice: defaultValues?.customPrice ?? defaultValues?.pricePerUnit ?? 0,
+      startDate: defaultValues?.startDate ?? todayLocal(),
       deliverySchedule: defaultValues?.deliverySchedule ?? 'daily',
       customDays: defaultValues?.customDays ?? [],
       deliverySlot: initialSlots.slots[0],
@@ -146,8 +140,7 @@ export function SubscriptionForm({
     },
   });
 
-  const { register, handleSubmit, watch, setValue, formState } = form;
-  const { errors } = formState;
+  const { register, handleSubmit, watch, setValue } = form;
 
   const products = productsQuery.data ?? [];
   const customers = customersQuery.data ?? [];
@@ -163,23 +156,14 @@ export function SubscriptionForm({
 
   const selectedProduct = products.find((p) => getId(p) === productId);
   const variants = selectedProduct?.variants ?? [];
-  const defaultVariantIndex = Math.max(
-    variants.findIndex((v) => v.isDefault),
-    0,
-  );
+  const defaultVariantIndex = Math.max(variants.findIndex((v) => v.isDefault), 0);
   const defaultVariant = variants[defaultVariantIndex];
-  const defaultPrice = defaultVariant
-    ? variantPrice(defaultVariant)
-    : Number(selectedProduct?.basePrice ?? selectedProduct?.price ?? 0);
+  const defaultPrice = defaultVariant ? variantPrice(defaultVariant) : Number(selectedProduct?.basePrice ?? selectedProduct?.price ?? 0);
   const unitHint = defaultVariant?.unit ?? selectedProduct?.unit;
   const isCustomPrice = Number(customPrice) > 0 && Number(customPrice) !== Number(defaultPrice);
-  // Total daily quantity across all selected slots.
   const totalQtyPerDelivery =
     selectedSlots.length > 1
-      ? selectedSlots.reduce(
-          (sum, slot) => sum + (Number(slotQuantities[slot] ?? quantityPerDelivery) || 0),
-          0,
-        )
+      ? selectedSlots.reduce((sum, slot) => sum + (Number(slotQuantities[slot] ?? quantityPerDelivery) || 0), 0)
       : Number(quantityPerDelivery || 0);
   const deliveryTotal = totalQtyPerDelivery * Number(customPrice || defaultPrice || 0);
 
@@ -187,10 +171,7 @@ export function SubscriptionForm({
     setValue('productId', nextProductId, { shouldValidate: true });
     const next = products.find((p) => getId(p) === nextProductId);
     const nextVariants = next?.variants ?? [];
-    const idx = Math.max(
-      nextVariants.findIndex((v) => v.isDefault),
-      0,
-    );
+    const idx = Math.max(nextVariants.findIndex((v) => v.isDefault), 0);
     const dv = nextVariants[idx];
     if (dv) {
       setValue('variantId', variantIdOf(dv, idx));
@@ -208,29 +189,18 @@ export function SubscriptionForm({
 
   const toggleSlot = (slot: SlotOption) => {
     const isSelected = selectedSlots.includes(slot);
-    const next = isSelected
-      ? selectedSlots.filter((s) => s !== slot)
-      : [...selectedSlots, slot];
-    // At least one slot must remain selected.
+    const next = isSelected ? selectedSlots.filter((s) => s !== slot) : [...selectedSlots, slot];
     if (next.length === 0) return;
     setValue('slots', next, { shouldValidate: true });
-    // First selected slot is the subscription's primary slot.
     setValue('deliverySlot', next[0], { shouldValidate: true });
-    // Seed per-slot quantities so multi-slot payloads always carry a value.
     if (!isSelected && slotQuantities[slot] === undefined) {
-      setValue(
-        'slotQuantities',
-        { ...slotQuantities, [slot]: Number(quantityPerDelivery) || 1 },
-        { shouldValidate: true },
-      );
+      setValue('slotQuantities', { ...slotQuantities, [slot]: Number(quantityPerDelivery) || 1 }, { shouldValidate: true });
     }
   };
 
   const setSlotQuantity = (slot: SlotOption, value: string) => {
     const qty = value === '' ? undefined : Number(value);
     setValue('slotQuantities', { ...slotQuantities, [slot]: qty }, { shouldValidate: true });
-    // Keep the top-level quantity in sync with the first slot so legacy
-    // single-slot displays stay sensible.
     if (slot === selectedSlots[0] && qty !== undefined && qty >= 1) {
       setValue('quantityPerDelivery', qty, { shouldValidate: true });
     }
@@ -240,20 +210,11 @@ export function SubscriptionForm({
     <form
       onSubmit={handleSubmit((values) => {
         const v = values as unknown as SubscriptionInput;
-        const slots = (v.slots ?? []).filter((s): s is SlotOption =>
-          SLOT_OPTIONS.includes(s as SlotOption),
-        );
+        const slots = (v.slots ?? []).filter((s): s is SlotOption => SLOT_OPTIONS.includes(s as SlotOption));
         const slotQtyMap = v.slotQuantities ?? {};
-        // Backend payload: per-slot quantities when multiple slots, otherwise a
-        // single slot + quantity. quantityPerDelivery is always the daily
-        // total across slots (the backend also accepts per-slot entries that
-        // fall back to it).
         const deliverySlots = slots.map((slot) => ({
           slot,
-          quantityPerDelivery:
-            slots.length > 1
-              ? Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || 1
-              : Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || v.quantityPerDelivery,
+          quantityPerDelivery: slots.length > 1 ? Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || 1 : Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || v.quantityPerDelivery,
         }));
         const total = deliverySlots.reduce((sum, s) => sum + (s.quantityPerDelivery ?? 0), 0);
         onSubmit({
@@ -265,42 +226,31 @@ export function SubscriptionForm({
           slotQuantities: slotQtyMap,
         });
       })}
-      className="flex flex-col gap-4"
+      id="subscription-form"
+      className="form-stack flex flex-col gap-4"
     >
       {!fixedCustomerId && (
-        <FormField
-          label="Customer"
-          required
-          error={
-            errors.userId?.message ??
-            (customersQuery.isError ? getErrorMessage(customersQuery.error) : undefined)
-          }
-        >
-          <SearchableSelect
-            options={customers.map((c) => {
-              const name = getName(c);
-              return {
-                id: getId(c),
-                label: c.phone ? `${name} · ${c.phone}` : name,
-              };
-            })}
-            value={watch('userId')}
-            onChange={(id) => setValue('userId', id, { shouldValidate: true })}
-            placeholder="Search customer by name or phone…"
-            onSearch={setCustomerSearch}
-          />
-        </FormField>
+        <div className="form-group">
+          <label className="block text-xs font-medium text-slate-700">Customer</label>
+          {customersQuery.isLoading ? (
+            <p className="text-sm text-slate-500">Loading customers…</p>
+          ) : (
+            <SearchableSelect
+              options={customers.map((c) => {
+                const name = getName(c);
+                return { id: getId(c), label: c.phone ? `${name} · ${c.phone}` : name };
+              })}
+              value={watch('userId')}
+              onChange={(id) => setValue('userId', id, { shouldValidate: true })}
+              placeholder="Search customer by name or phone…"
+              onSearch={setCustomerSearch}
+            />
+          )}
+        </div>
       )}
 
-      <FormField
-        label="Product"
-        required
-        error={
-          errors.productId?.message ??
-          (productsQuery.isError ? getErrorMessage(productsQuery.error) : undefined)
-        }
-        hint={unitHint ? `Unit: ${unitHint}` : undefined}
-      >
+      <div className="form-group">
+        <label className="block text-xs font-medium text-slate-700">Product</label>
         <Select aria-label="Product" value={productId} onChange={(e) => handleProductChange(e.target.value)}>
           <option value="">{productsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
           {products.map((p) => (
@@ -309,47 +259,35 @@ export function SubscriptionForm({
             </option>
           ))}
         </Select>
-      </FormField>
+      </div>
 
       {variants.length > 0 && (
-        <FormField label="Variant">
-          <div className="flex flex-wrap gap-2">
+        <div className="form-group">
+          <label className="block text-xs font-medium text-slate-700">Variant</label>
+          <Select value={variantId ?? ''} onChange={(e) => {
+            const vid = e.target.value || undefined;
+            const variant = vid ? variants.find((v) => variantIdOf(v, variants.indexOf(v)) === vid) : null;
+            setValue('variantId', vid, { shouldValidate: true });
+            setValue('customPrice', variant ? variantPrice(variant) : Number(selectedProduct?.price ?? 0), { shouldValidate: true });
+          }}>
+            <option value="">Default variant</option>
             {variants.map((v, i) => {
               const vid = variantIdOf(v, i);
-              const active = (variantId ?? '') === vid;
               return (
-                <button
-                  key={vid}
-                  type="button"
-                  onClick={() => {
-                    setValue('variantId', vid);
-                    setValue('customPrice', variantPrice(v), { shouldValidate: true });
-                  }}
-                  className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    active
-                      ? 'border-primary-600 bg-primary-50 text-primary-800'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                  aria-pressed={active}
-                >
-                  {v.label} · {formatCurrency(variantPrice(v))}
-                </button>
+                <option key={vid} value={vid}>
+                  {v.label} — {formatCurrency(variantPrice(v))}
+                </option>
               );
             })}
-          </div>
-        </FormField>
+          </Select>
+        </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="form-row grid grid-cols-1 sm:grid-cols-2 gap-3">
         {selectedSlots.length > 1 ? (
           <>
             {selectedSlots.map((slot) => (
-              <FormField
-                key={slot}
-                label={`${slotLabel(slot)} qty / delivery`}
-                required
-                error={(errors.slotQuantities?.[slot]?.message ?? '') as string | undefined}
-              >
+              <FormField key={slot} label={`${slotLabel(slot)} qty / delivery`} required>
                 <Input
                   type="number"
                   min={0.001}
@@ -361,93 +299,91 @@ export function SubscriptionForm({
             ))}
           </>
         ) : (
-          <FormField label="Qty / delivery" required error={errors.quantityPerDelivery?.message}>
+          <div className="form-group">
+            <label className="block text-xs font-medium text-slate-700">Qty / delivery</label>
             <Input type="number" min={0.001} step={0.001} {...register('quantityPerDelivery')} />
-          </FormField>
+          </div>
         )}
-        <FormField
-          label="Price / unit"
-          error={errors.customPrice?.message}
-          hint={selectedProduct ? `Default ${formatCurrency(defaultPrice)}` : undefined}
-        >
+        <div className="form-group">
+          <label className="block text-xs font-medium text-slate-700 flex items-center gap-1">
+            Price per Unit
+            {isCustomPrice && <span className="price-custom-badge text-[10px] font-bold bg-warning-bg border-warning/20 text-warning px-1.5 py-0.5 rounded-full">CUSTOM</span>}
+          </label>
           <div className="flex items-center gap-2">
             <Input type="number" min={0.01} step={0.01} {...register('customPrice')} />
-            {selectedProduct && isCustomPrice && <Badge variant="warning">CUSTOM</Badge>}
+            {selectedProduct && isCustomPrice && <span className="text-[10px] text-slate-500">Default {formatCurrency(defaultPrice)}</span>}
           </div>
-        </FormField>
+          {selectedProduct && (
+            <p className="mt-1 text-xs text-slate-500">
+              {unitHint
+                ? `Standard rate: ${formatCurrency(defaultPrice)}/${unitHint}`
+                : `Standard rate: ${formatCurrency(defaultPrice)}`}
+              {isCustomPrice && ' — custom rate will override'}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        Daily total:{' '}
-        <span className="font-semibold text-slate-900">
-          {totalQtyPerDelivery} unit{totalQtyPerDelivery === 1 ? '' : 's'} · {formatCurrency(deliveryTotal)}
-        </span>
-      </div>
+      {selectedProduct && totalQtyPerDelivery > 0 && deliveryTotal > 0 && (
+        <div className="sub-preview-banner rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <span className="sub-preview-label text-slate-500">Daily total</span>
+          <strong className="sub-preview-value text-slate-900 font-semibold">
+            {`₹${deliveryTotal.toFixed(2)}/day`}
+          </strong>
+        </div>
+      )}
 
-      <FormField label="Start date" required error={errors.startDate?.message}>
+      <div className="form-group">
+        <label className="block text-xs font-medium text-slate-700">Start Date</label>
         <Input type="date" {...register('startDate')} />
-      </FormField>
+      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Schedule" required error={errors.deliverySchedule?.message}>
-          <Select {...register('deliverySchedule')}>
-            <option value="daily">Daily</option>
-            <option value="alternate">Alternate</option>
-            <option value="weekly">Weekly</option>
-            <option value="custom">Custom</option>
-          </Select>
-        </FormField>
-        <FormField
-          label="Delivery slots"
-          required
-          error={errors.slots?.message}
-          hint={selectedSlots.length > 1 ? 'Per-slot quantities required' : 'Select one or both slots'}
-        >
-          <div className="flex gap-2">
-            {SLOT_OPTIONS.map((slot) => {
-              const active = selectedSlots.includes(slot);
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => toggleSlot(slot)}
-                  className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    active
-                      ? 'border-primary-600 bg-primary-50 text-primary-800'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                  aria-pressed={active}
-                >
-                  {slotLabel(slot)}
-                </button>
-              );
-            })}
-          </div>
-        </FormField>
+      <div className="form-group">
+        <label className="block text-xs font-medium text-slate-700">Delivery Schedule</label>
+        <Select {...register('deliverySchedule')}>
+          <option value="daily">Daily</option>
+          <option value="alternate">Alternate Days</option>
+          <option value="weekly">Weekly</option>
+          <option value="custom">Custom</option>
+        </Select>
       </div>
 
       {schedule === 'custom' && (
-        <FormField
-          label="Custom days"
-          required
-          error={errors.customDays?.message}
-          hint="Select at least one delivery day"
-        >
-          <div className="flex flex-wrap gap-2">
+        <div className="form-group">
+          <label className="block text-xs font-medium text-slate-700">Custom Days</label>
+          <div className="days-selector flex flex-wrap gap-2">
             {WEEK_DAYS.map((day) => (
-              <label
-                key={day}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
+              <label key={day} className="day-chip flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 <Checkbox checked={customDays.includes(day)} onChange={() => toggleDay(day)} />
-                {day}
+                <span>{day.slice(0, 3)}</span>
               </label>
             ))}
           </div>
-        </FormField>
+        </div>
       )}
 
-      <Button type="submit" loading={submitting} className="min-h-11">
+      <div className="form-group">
+        <label className="block text-xs font-medium text-slate-700">Delivery Slots</label>
+        <div className="flex gap-2">
+          {SLOT_OPTIONS.map((slot) => {
+            const active = selectedSlots.includes(slot);
+            return (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => toggleSlot(slot)}
+                className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  active ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`} aria-pressed={active}
+              >
+                {slotLabel(slot)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Button type="submit" loading={submitting} className="min-h-11 w-full">
         Save subscription
       </Button>
     </form>

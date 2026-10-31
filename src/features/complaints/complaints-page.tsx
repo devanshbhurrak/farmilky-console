@@ -196,7 +196,7 @@ export default function ComplaintsPage() {
               </div>
               <p className="text-xs text-slate-500">{c.description ?? 'No description'}</p>
               <p className="text-xs text-slate-500">
-                {c.customerName ?? getName(c.userId)} · {formatDate(c.createdAt)}
+                {getName(c.userId, c.customerName ?? '—')} · {formatDate(c.createdAt)}
               </p>
               {NEXT_STATUS[String(c.status)] && (
                 <Button

@@ -11,6 +11,7 @@ import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
+import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,6 +93,16 @@ export default function CustomersPage() {
     () => enrichCustomersArea(query.data?.items ?? [], areas),
     [query.data?.items, areas],
   );
+
+  const createAction = React.useMemo(
+    () => (
+      <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm min-h-[36px]">
+        <Plus aria-hidden /> Add Customer
+      </Button>
+    ),
+    [setCreateOpen],
+  );
+  useRegisterHeaderAction(createAction);
 
   const activeFilters: ActiveFilter[] = [];
   if (status !== 'all') {
@@ -182,14 +193,7 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Customers"
-        actions={
-          <Button onClick={() => setCreateOpen(true)} className="px-3 py-1.5 text-sm">
-            <Plus aria-hidden /> Customer
-          </Button>
-        }
-      />
+      <PageHeader title="Customers" />
 
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">

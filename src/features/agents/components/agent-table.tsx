@@ -7,10 +7,7 @@ import { getId, getName } from '@/lib/utils';
 import type { Agent } from '@/types/agent';
 
 export function agentAreaName(agent: Agent): string | null {
-  const raw = agent.agentInfo?.assignedArea;
-  if (typeof raw === 'string') return agent.assignedAreaName ?? (raw || null);
-  if (raw && typeof raw === 'object') return raw.name ?? null;
-  return agent.assignedAreaName ?? null;
+  return getName(agent.agentInfo?.assignedArea, agent.assignedAreaName ?? undefined);
 }
 
 export function AgentCard({ agent, onClick }: { agent: Agent; onClick?: (agent: Agent) => void }) {

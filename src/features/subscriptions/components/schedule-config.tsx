@@ -14,7 +14,14 @@ import { useCancelScheduleChange, useScheduleChange } from '../hooks';
 import { slotConfigOf } from '../api';
 import type { SubscriptionDetail } from '../api';
 
-export function ScheduleConfig({ subscription }: { subscription: SubscriptionDetail }) {
+export function ScheduleConfig({
+  subscription,
+  hidePendingRow = false,
+}: {
+  subscription: SubscriptionDetail;
+  /** Hide the inline pending-change row — the parent renders its own banner. */
+  hidePendingRow?: boolean;
+}) {
   const slotConfig = slotConfigOf(subscription);
   const isMultiSlot = slotConfig.length > 1;
   const [effectiveDate, setEffectiveDate] = useState('');
@@ -98,7 +105,7 @@ export function ScheduleConfig({ subscription }: { subscription: SubscriptionDet
           </span>
         </div>
 
-        {pending && (
+        {pending && !hidePendingRow && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg bg-warning-bg px-3 py-2">
             <Badge variant="warning">Pending change</Badge>
             <span className="text-slate-700">

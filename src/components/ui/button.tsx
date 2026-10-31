@@ -14,10 +14,10 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-10 min-h-10 px-3 text-xs',
-  default: 'h-11 min-h-11 px-4 text-sm',
-  lg: 'h-12 min-h-12 px-5 text-base',
-  icon: 'h-11 min-h-11 w-11',
+  sm: 'h-8 min-h-8 px-3 text-xs',
+  default: 'h-9 min-h-9 px-4 text-sm',
+  lg: 'h-10 min-h-10 px-5 text-base',
+  icon: 'h-9 min-h-9 w-9',
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,7 +32,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
         variants[variant],
         sizes[size],
         variant === 'link' && 'min-h-0 px-0 py-0 h-auto',

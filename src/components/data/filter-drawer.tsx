@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -81,14 +81,6 @@ export function FilterDrawer({
               </SheetDescription>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            aria-label="Close filters"
-            className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
-          >
-            <X className="size-5" />
-          </button>
         </SheetHeader>
         <SheetBody className="flex flex-col gap-4 pt-2 overflow-y-auto max-h-[60vh] pb-20">{children}</SheetBody>
         <SheetFooter className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:border-t-0 md:bg-transparent md:p-0 flex flex-row items-center gap-2">

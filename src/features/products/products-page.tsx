@@ -38,6 +38,7 @@ function toProductInput(product: Product): ProductInput {
         : Number(product.fatContent),
     imageUrl: product.imageUrl ?? product.image ?? '',
     variants: (product.variants ?? []).map((variant) => ({
+      id: variant.id || variant._id || undefined,
       label: variant.label,
       quantity: Number(variant.quantity ?? 1),
       unit: (PRODUCT_UNITS as readonly string[]).includes(variant.unit ?? '')

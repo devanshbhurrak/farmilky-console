@@ -1,26 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage, normalizeList, unwrapData } from '@/lib/utils';
-import type { DeliveryHistoryEntry, Subscription, SubscriptionListParams } from '@/types/subscription';
+import type { Subscription, SubscriptionListParams } from '@/types/subscription';
 import { subscriptionsApi } from './api';
 import type { ScheduleChangeRequest, SubscriptionDetail } from './api';
 import type { SubscriptionInput, SubscriptionOutcomeInput } from './schemas';
-
-function monthKey(month: string | number | undefined, year: string | number | undefined): string | null {
-  if (month === undefined || year === undefined) return null;
-  const m = Number(month);
-  const y = Number(year);
-  if (Number.isNaN(m) || Number.isNaN(y) || m < 1 || m > 12) return null;
-  return `${y}-${String(m).padStart(2, '0')}`;
-}
-
-function filterByMonth(items: DeliveryHistoryEntry[], month: string | number | undefined, year: string | number | undefined): DeliveryHistoryEntry[] {
-  const key = monthKey(month, year);
-  if (!key) return items;
-  return items.filter((e) => typeof e.deliveryDate === 'string' && e.deliveryDate.slice(0, 7) === key);
-}
 
 export function useSubscriptions(params: SubscriptionListParams) {
   return useQuery({
@@ -57,33 +42,6 @@ export function useSubscription(id: string | undefined) {
     },
     enabled: Boolean(id),
     placeholderData: keepPreviousData,
-  });
-}
-
-export function useSubscriptionHistory(
-  id: string | undefined,
-  opts: { month?: string | number; year?: string | number } = {},
-) {
-  const { month, year } = opts;
-  return useQuery({
-    queryKey: [...queryKeys.subscriptions.detail(id ?? ''), 'history', { month, year }],
-    queryFn: async (): Promise<{ items: DeliveryHistoryEntry[] }> => {
-      const subId = id as string;
-      try {
-        const res = await subscriptionsApi.history(subId, { month, year, limit: 100 });
-        const { items } = normalizeList<DeliveryHistoryEntry>(res, ['history', 'deliveries', 'records']);
-        return { items: filterByMonth(items, month, year) };
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          const detail = await subscriptionsApi.get(subId);
-          const data = unwrapData<SubscriptionDetail>(detail);
-          const embedded = data.history ?? data.deliveries ?? [];
-          return { items: filterByMonth(embedded, month, year) };
-        }
-        throw err;
-      }
-    },
-    enabled: Boolean(id),
   });
 }
 

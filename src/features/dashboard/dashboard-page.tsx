@@ -138,7 +138,6 @@ export default function DashboardPage() {
       />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">All modules</h2>
         <SectionNavigator />
       </section>
     </div>

@@ -59,6 +59,12 @@ export const queryKeys = {
     today: () => ['manifests', 'my-today'] as const,
     history: (filters: unknown) => ['manifests', 'my-history', filters] as const,
   },
+  deliveries: {
+    all: () => ['deliveries'] as const,
+    sessionState: (date: string) => ['deliveries', 'session-state', date] as const,
+    detail: (id: string) => ['deliveries', 'detail', id] as const,
+    unconfirmed: (days: number, slot: string) => ['deliveries', 'unconfirmed', days, slot] as const,
+  },
   suppliers: {
     all: () => ['suppliers'] as const,
     list: (filters: unknown) => ['suppliers', 'list', filters] as const,

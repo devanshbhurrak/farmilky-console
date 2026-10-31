@@ -271,6 +271,7 @@ export function ProductForm({ defaultValues, onSubmit, submitting }: ProductForm
                   Remove
                 </Button>
               </div>
+              <input type="hidden" {...register(`variants.${i}.id` as const)} />
               <FormField label="Label" required error={errors.variants?.[i]?.label?.message}>
                 <Input placeholder="e.g. 500 ml pack" {...register(`variants.${i}.label` as const)} />
               </FormField>

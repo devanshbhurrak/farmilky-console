@@ -4,7 +4,28 @@ import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Pencil } from 'lucide-react';
+import {
+  Pencil,
+  Phone,
+  MapPin,
+  Mail,
+  CreditCard,
+  IndianRupee,
+  Calendar,
+  ChevronRight,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  Wallet,
+  Settings,
+  X,
+  Plus,
+  Minus,
+  RefreshCw,
+} from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -18,8 +39,19 @@ import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
 import { StatusBadge } from '@/components/data/status-badge';
 import { FormField, FormSection } from '@/components/form/form-field';
-import { formatCurrency, formatDate, getId, todayLocal } from '@/lib/utils';
-import { useCollectionTotal, useRecordSupplierAdjustment, useRecordSupplierPayment, useSupplier, useSupplierPassbook, useUpdateSupplier } from './hooks';
+import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency, formatDate, getId, todayLocal, cn } from '@/lib/utils';
+import {
+  useCollectionTotal,
+  useRecordSupplierAdjustment,
+  useRecordSupplierPayment,
+  useSupplier,
+  useSupplierPassbook,
+  useUpdateSupplier,
+} from './hooks';
 import { SupplierForm } from './components/supplier-form';
 import type { SupplierInput } from './schemas';
 import type { LedgerEntry } from '@/types/customer';

@@ -1,79 +1,70 @@
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/data/status-badge';
-import { formatCurrency, getName, getPhone, titleCase } from '@/lib/utils';
-import { slotConfigOf } from '../api';
+import { formatCurrency, formatDate, getName } from '@/lib/utils';
 import type { Subscription } from '@/types/subscription';
 
+const SCHEDULE_LABEL: Record<string, string> = {
+  daily: 'Daily', alternate: 'Alt. days', weekly: 'Weekly', custom: 'Custom',
+};
+
+/**
+ * Card content rendered inside DataTable's Card wrapper on mobile, so this
+ * must not itself be a Card (that would produce a nested double card).
+ */
 export function SubscriptionCard({
   subscription,
-  selected,
-  onSelect,
   onClick,
 }: {
   subscription: Subscription;
-  selected?: boolean;
-  onSelect?: (checked: boolean) => void;
   onClick?: () => void;
 }) {
   const customer = getName(subscription.userId, subscription.customerName ?? '—');
-  const phone = getPhone(subscription.userId) || subscription.customerPhone;
   const product = getName(subscription.productId, subscription.productName ?? '—');
+  const unit = typeof subscription.productId === 'object' ? subscription.productId.unit : undefined;
   const qty = subscription.quantityPerDelivery ?? subscription.quantityPerDay ?? 0;
-  const rate = subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0;
-  const daily = subscription.totalPricePerDelivery ?? subscription.totalPricePerDay ?? qty * rate;
-  const standardRate =
-    typeof subscription.productId === 'object' && subscription.productId !== null
-      ? (subscription.productId.basePrice ?? subscription.productId.price ?? subscription.pricePerPacket ?? subscription.pricePerUnit)
-      : (subscription.pricePerPacket ?? subscription.pricePerUnit);
-  const isCustom = Number(subscription.pricePerPacket ?? subscription.pricePerUnit) !== Number(standardRate);
-  const slotConfig = slotConfigOf(subscription);
-  const isMultiSlot = slotConfig.length > 1;
-  const slot = subscription.deliverySlot ?? subscription.slot;
+  const daily = subscription.totalPricePerDelivery ?? subscription.totalPricePerDay ?? qty * (subscription.pricePerPacket ?? subscription.pricePerUnit ?? 0);
+  const pendingAmount = subscription.pendingAmount ?? 0;
+  const scheduleLabel = SCHEDULE_LABEL[subscription.deliverySchedule] ?? subscription.deliverySchedule;
+  const status = subscription.status;
 
   return (
-    <Card
-      className={selected ? 'border-primary-500 ring-1 ring-primary-500' : undefined}
+    <div
+      className="cursor-pointer"
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(); } : undefined}
     >
-      <CardContent className="flex items-start gap-3 p-4">
-        {onSelect && (
-          <Checkbox
-            checked={selected ?? false}
-            onChange={(e) => {
-              e.stopPropagation();
-              onSelect(e.target.checked);
-            }}
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Select subscription for ${customer}`}
-            className="mt-1"
-          />
-        )}
-        <button type="button" onClick={onClick} className="flex flex-1 flex-col gap-1.5 text-left">
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-slate-900">{customer}</span>
-            <StatusBadge status={subscription.status} />
+      <div className="mc-head mc-head--status">
+        <div className="mc-identity">
+          <span className="mc-name">{customer}</span>
+          <span className="mc-sub">
+            {product} &middot; {qty}&nbsp;{unit ?? 'unit'}
+            {subscription.customerPhone ? ` · ${subscription.customerPhone}` : ''}
           </span>
-          {phone && <span className="text-xs text-slate-500">{phone}</span>}
-          <span className="text-sm text-slate-700">
-            {product} · {qty}/delivery · {titleCase(subscription.deliverySchedule)}
+        </div>
+        <div className="mc-tags">
+          <StatusBadge status={status} />
+          <span className={`mc-schedule-tag schedule-${subscription.deliverySchedule}`}>
+            {scheduleLabel}
           </span>
-          <span className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-slate-900">{formatCurrency(daily)}</span>
-            {isCustom && <Badge variant="warning">CUSTOM</Badge>}
-            <span className="text-xs text-slate-500">
-              {isMultiSlot
-                ? `${slotConfig
-                    .map(
-                      (s) =>
-                        `${s.quantityPerDelivery} ${s.slot === 'morning' ? 'AM' : 'PM'}`,
-                    )
-                    .join(' · ')} slots`
-                : `${titleCase(typeof slot === 'string' ? slot : 'morning')} slot`}
-            </span>
+        </div>
+      </div>
+      <div className="mc-stats mt-3">
+        <div className="mc-stat">
+          <span className="mc-stat-label">Daily Value</span>
+          <span className="mc-stat-value">{formatCurrency(daily)}</span>
+        </div>
+        <div className="mc-stat">
+          <span className="mc-stat-label">Since</span>
+          <span className="mc-stat-value">{formatDate(subscription.startDate)}</span>
+        </div>
+        <div className="mc-stat">
+          <span className={`mc-stat-value ${pendingAmount > 0 ? 'danger' : 'muted'}`}>
+            {formatCurrency(pendingAmount)}
           </span>
-        </button>
-      </CardContent>
-    </Card>
+          <span className="mc-stat-label">Pending</span>
+        </div>
+      </div>
+    </div>
   );
 }

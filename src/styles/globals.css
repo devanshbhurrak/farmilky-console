@@ -109,3 +109,192 @@ input[type="number"] {
 .page-enter > div {
   flex-grow: 1;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUBSCRIPTION LIST PAGE  —  .mc-* classes (matching previous outdated UI)
+   ══════════════════════════════════════════════════════════════════════════ */
+.mc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.mc-identity {
+  min-width: 0;
+}
+.mc-name {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mc-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--slate-500);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mc-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.mc-schedule-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--slate-100);
+  border: 1px solid var(--slate-200);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--slate-600);
+  white-space: nowrap;
+}
+.mc-schedule-tag.schedule-daily { background: var(--success-bg); border-color: rgba(16,185,129,0.2); color: var(--success); }
+.mc-schedule-tag.schedule-alternate { background: var(--info-bg); border-color: rgba(59,130,246,0.2); color: var(--info); }
+.mc-schedule-tag.schedule-weekly { background: var(--accent-50); border-color: rgba(139,92,246,0.2); color: var(--accent-500); }
+.mc-schedule-tag.schedule-custom { background: var(--warning-bg); border-color: rgba(245,158,11,0.3); color: var(--warning); }
+.mc-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.mc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.mc-stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-500);
+  line-height: 1;
+}
+.mc-stat-value {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--slate-900);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.mc-stat-value.danger { color: var(--danger); }
+.mc-stat-value.muted { color: var(--slate-500); }
+.stack-cell { display: flex; flex-direction: column; gap: 0.15rem; }
+.price-badge { white-space: nowrap; }
+.cell-sub { display: block; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SUBSCRIPTION DETAIL PAGE  —  .sd-* classes (matching previous outdated UI)
+   ══════════════════════════════════════════════════════════════════════════ */
+.sd-page { gap: var(--space-3); }
+.sd-hero { }
+.sd-summary-card { }
+.sd-stats-row { }
+.sd-grid { }
+.sd-col { }
+.sd-card { }
+.sd-card-header { }
+.sd-card-title { }
+.sd-card-title-icon { }
+.sd-card-link { }
+.sd-card-badge { }
+.sd-card-body { }
+.sd-empty { }
+.sd-plan-rows { }
+.sd-plan-row { }
+.sd-plan-key { }
+.sd-plan-val { }
+.sd-plan-val--bold { }
+.sd-plan-val--price { }
+.sd-plan-val--muted { }
+.sd-custom-tag { }
+.sd-customer-name { }
+.sd-contact-rows { }
+.sd-contact-row { }
+.sd-contact-icon { }
+.sd-table-wrap { }
+.sd-table { }
+.sd-td-date { }
+.sd-td-num { }
+.sd-td-amount { }
+.sd-td-reason { }
+.sd-tr { }
+.sd-history-list { }
+.sd-history-row { }
+.sd-history-dot { }
+.sd-history-body { }
+.sd-history-top { }
+.sd-history-date { }
+.sd-history-amount { }
+.sd-history-meta { }
+.sd-history-qty { }
+.sd-history-reason { }
+.sd-financial-summary { }
+.sd-fin-row { }
+.sd-fin-label { }
+.sd-fin-value { }
+.sd-fin-value--danger { }
+.sd-fin-value--bold { }
+.sd-history-header { }
+.sd-history-controls { }
+.sd-month-nav { }
+.sd-month-btn { }
+.sd-month-label { }
+.sd-month-current-dot { }
+.sd-month-summary { }
+.sd-month-summary-item { }
+.sd-month-summary-label { }
+.sd-month-summary-value { }
+.sd-month-summary-value--money { }
+.sd-month-summary-divider { }
+.sd-status-badge { }
+.sd-status-actions { }
+.sd-summary-product { }
+.sd-summary-product-icon { }
+.sd-summary-img { }
+.sd-summary-info { }
+.sd-summary-name { }
+.sd-summary-since { }
+.sd-summary-chips { }
+.sd-chip { }
+.sd-chip--money { }
+.sd-hero-product { }
+.sd-hero-product-icon { }
+.sd-hero-img { }
+.sd-hero-product-info { }
+.sd-hero-top { }
+.sd-hero-name { }
+.sd-hero-meta { }
+.sd-hero-stats { }
+.sd-hero-stat { }
+.sd-hero-stat-divider { }
+.sd-hero-stat-label { }
+.sd-hero-stat-value { }
+.sd-stat { }
+.sd-stat-icon { }
+.sd-stat-body { }
+.sd-stat-label { }
+.sd-stat-value { }
+.sd-stat-sub { }
+.view-stack { }
+
+/* Responsive overrides for detail page */
+@media (max-width: 767px) {
+  .sd-hero { display: none; }
+}
+@media (min-width: 768px) {
+  .sd-summary-card { display: none; }
+  .sd-history-list { display: none; }
+}

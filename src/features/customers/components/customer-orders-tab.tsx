@@ -7,8 +7,7 @@ import { useCustomerOrders } from '../hooks';
 import type { Order } from '@/types/order';
 
 function orderCustomerName(order: Order): string {
-  if (typeof order.userId === 'object' && order.userId !== null) return order.userId.name;
-  return order.customerName ?? getName(order.userId);
+  return getName(order.userId, order.customerName ?? '—');
 }
 
 function orderAmount(order: Order): number {

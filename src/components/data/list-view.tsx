@@ -262,18 +262,7 @@ export function ListView<T>({
 
   const headerActions = (() => {
     const actions: React.ReactNode[] = [];
-    if (createAction) {
-      actions.push(createAction);
-    }
-    if (filterConfig) {
-      actions.push(
-        <FilterButton
-          key="filter-btn"
-          activeCount={activeFilters.length}
-          onClick={openFilterDrawer}
-        />
-      );
-    }
+    // createAction and filter button removed from header per requirement
     return actions.length > 0 ? <div className="flex items-center gap-2">{actions}</div> : null;
   })();
 
@@ -286,13 +275,20 @@ export function ListView<T>({
       />
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-row gap-2">
           <SearchInput
             value={searchValue}
             onChange={handleSearchChange}
             placeholder={searchPlaceholder}
-            className="flex-1 sm:max-w-xs"
+            className="flex-1 min-w-0"
           />
+          {filterConfig && (
+            <FilterButton
+              activeCount={activeFilters.length}
+              onClick={openFilterDrawer}
+              className="flex shrink-0"
+            />
+          )}
           {filterConfig && (
             <div className="hidden sm:flex flex-wrap items-center gap-2">
               {Object.entries(filterConfig.fields).map(([key, field]) => (

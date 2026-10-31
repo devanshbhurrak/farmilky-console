@@ -22,7 +22,7 @@ export function AppShell() {
       <div className="flex min-h-dvh flex-col lg:pl-[var(--sidebar-width)]">
         <TopBar />
         <MobileHeader />
-        <main id="main-content" className="mx-auto flex w-full max-w-7xl flex-1 flex-col p-4 pb-24 lg:p-6 lg:pb-10 xl:p-8">
+        <main id="main-content" className="mx-auto flex w-full max-w-7xl flex-1 flex-col p-2 pb-24 lg:p-6 lg:pb-10 xl:p-8">
           <div key={location.pathname} className="page-enter flex flex-1 flex-col">
             <Outlet />
           </div>

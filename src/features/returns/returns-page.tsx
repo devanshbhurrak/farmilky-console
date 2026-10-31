@@ -58,7 +58,7 @@ export default function ReturnsPage() {
       header: 'Customer',
       cell: (r) => (
         <div>
-          <p className="font-medium text-slate-900">{r.customerName ?? getName(r.userId)}</p>
+          <p className="font-medium text-slate-900">{getName(r.userId, r.customerName ?? '—')}</p>
           <p className="text-xs text-slate-500">Order {orderLabel(r.orderId)}</p>
         </div>
       ),
@@ -135,7 +135,7 @@ export default function ReturnsPage() {
           <Card>
             <CardContent className="flex flex-col gap-2 pt-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-900">{r.customerName ?? getName(r.userId)}</p>
+                <p className="text-sm font-medium text-slate-900">{getName(r.userId, r.customerName ?? '—')}</p>
                 <StatusBadge status={String(r.status)} />
               </div>
               <p className="text-xs text-slate-500">Order {orderLabel(r.orderId)} · {formatDate(r.createdAt)}</p>
@@ -157,7 +157,7 @@ export default function ReturnsPage() {
           <SheetBody className="flex flex-col gap-4">
             {acting && (
               <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-                <p className="font-medium text-slate-900">{acting.customerName ?? getName(acting.userId)}</p>
+                <p className="font-medium text-slate-900">{getName(acting.userId, acting.customerName ?? '—')}</p>
                 <p>Order {orderLabel(acting.orderId)}</p>
                 <p className="mt-1">{acting.reason}</p>
               </div>

@@ -1,63 +1,54 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Calendar, RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardList, Clock } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { EmptyState } from '@/components/data/empty-state';
 import { ErrorState } from '@/components/data/error-state';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useDebounce } from '@/hooks/use-debounce';
 import { queryKeys } from '@/lib/query-keys';
-import { cn, getErrorMessage, getId, getName, normalizeList, todayLocal } from '@/lib/utils';
-import type { DeliveryBoardEntry } from '@/types/delivery';
+import { cn, getErrorMessage, todayLocal, toLocalDateStr } from '@/lib/utils';
+import type { DeliveryBoardEntry, DeliverySessionState } from '@/types/delivery';
 import { deliveriesApi } from './api';
-import { useDeliveryBoard, useDeliveryBoardSSE } from './hooks';
-import { CustomerGroup, entryKeyOf } from './components/customer-group';
-import type { CustomerGroupData } from './components/customer-group';
+import { useDeliveryBoard } from './hooks';
+import { DeliveryCard } from './components/delivery-card';
+import { DeliveryDetailsDrawer } from './components/delivery-details-drawer';
+import { UnconfirmedReview } from './components/unconfirmed-review';
 import { DeliveryFilters } from './components/delivery-filters';
-import type { AreaOption } from './components/delivery-filters';
-import { OutcomeSheet, resolveTarget } from './components/outcome-sheet';
-import { BulkActionsBar } from './components/bulk-actions-bar';
-import { CustomerConfirmDrawer } from './components/customer-confirm-drawer';
-import { ExtraProductsSection } from './components/extra-products-section';
 
 export default function DeliveriesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const datePickerRef = useRef<HTMLInputElement>(null);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeEntry, setActiveEntry] = useState<DeliveryBoardEntry | null>(null);
-  const [outcomeOpen, setOutcomeOpen] = useState(false);
-  const [confirmGroupKey, setConfirmGroupKey] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [extraGroup, setExtraGroup] = useState<CustomerGroupData | null>(null);
+  const [date, setDate] = useState(searchParams.get('date') || todayLocal());
+  const [slot, setSlot] = useState(searchParams.get('slot') || 'all');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [drawerEntry, setDrawerEntry] = useState<DeliveryBoardEntry | null>(null);
+  const [unconfirmedOpen, setUnconfirmedOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  const date = searchParams.get('date') || todayLocal();
-  const slot = searchParams.get('slot') || 'morning';
-  const type = searchParams.get('type') || 'all';
-  const status = searchParams.get('status') || '';
-  const area = searchParams.get('area') || '';
-  const search = searchParams.get('search') || '';
-  const sort = searchParams.get('sort') || 'sequence';
+  const debouncedSearch = useDebounce(search, 300);
 
-  const debouncedSearch = useDebounce(search, 400);
-
-  useDeliveryBoardSSE(true);
-
-  const areasQuery = useQuery({
-    queryKey: queryKeys.areas.list(),
-    queryFn: async (): Promise<AreaOption[]> => {
-      const res = await deliveriesApi.areasLite();
-      return normalizeList<{ id: string; name: string }>(res, ['areas']).items.map((a) => ({
-        id: getId(a),
-        name: getName(a),
-      }));
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.deliveries.sessionState(date),
+    queryFn: async () => {
+      const res = await deliveriesApi.sessionState({ date });
+      return res as DeliverySessionState;
     },
-    placeholderData: keepPreviousData,
+    enabled: !!date,
+    staleTime: 60_000,
   });
+
+  const eveningOpen = sessionQuery.data?.eveningOpen ?? true;
+  const isToday = sessionQuery.data?.isToday ?? date === todayLocal();
+  const eveningLocked = isToday && !eveningOpen;
 
   const boardQuery = useDeliveryBoard({
     date,
@@ -66,46 +57,27 @@ export default function DeliveriesPage() {
 
   const entries = useMemo(() => boardQuery.data?.entries ?? [], [boardQuery.data]);
 
-  // Client-side filtering (since backend now returns all entries for the date/slot)
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
-      if (type !== 'all' && e.type !== type) return false;
-      if (status && e.deliveryStatus !== status) return false;
-      if (area && e.areaId !== area) return false;
+      // Hide evening deliveries when the evening session is locked (before 5 PM IST today)
+      if (eveningLocked && e.deliverySlot === 'evening') return false;
+      if (statusFilter && e.deliveryStatus !== statusFilter) return false;
+      if (slot !== 'all' && e.deliverySlot !== slot) return false;
       if (debouncedSearch) {
         const needle = debouncedSearch.trim().toLowerCase();
-        const haystack = [
-          e.customerName,
-          e.productName,
-          e.areaName,
-          e.phone,
-          e.address,
-        ].filter(Boolean).join(' ').toLowerCase();
+        const haystack = [e.customerName, e.productName, e.areaName, e.phone, e.address]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
         if (!haystack.includes(needle)) return false;
       }
       return true;
     });
-  }, [entries, type, status, area, debouncedSearch]);
+  }, [entries, statusFilter, slot, debouncedSearch, eveningLocked]);
 
-  const summary = useMemo(
-    () => ({
-      total: filteredEntries.length,
-      remainingDeliveries: filteredEntries.filter((entry) => entry.canRecordOutcome).length,
-      delivered: filteredEntries.filter((entry) => entry.deliveryStatus === 'delivered').length,
-      pending: filteredEntries.filter((entry) => entry.deliveryStatus === 'pending').length,
-    }),
-    [filteredEntries],
-  );
-
-  const groups = useMemo<CustomerGroupData[]>(() => {
-    const sorted = [...filteredEntries];
-    if (sort === 'name') {
-      sorted.sort((a, b) => (a.customerName ?? '').localeCompare(b.customerName ?? ''));
-    } else {
-      sorted.sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-    }
-    const map = new Map<string, CustomerGroupData>();
-    for (const e of sorted) {
+  const groups = useMemo<{ key: string; customerName: string; phone: string | null; address: string | null; entries: DeliveryBoardEntry[] }[]>(() => {
+    const map = new Map<string, { key: string; customerName: string; phone: string | null; address: string | null; entries: DeliveryBoardEntry[] }>();
+    for (const e of filteredEntries) {
       const key = e.userId || e.customerName || 'unknown';
       const existing = map.get(key);
       if (existing) {
@@ -114,228 +86,208 @@ export default function DeliveriesPage() {
         map.set(key, {
           key,
           customerName: e.customerName || 'Unknown customer',
-          phone: e.phone,
-          address: e.address,
-          areaName: e.areaName,
-          lat: e.lat,
-          lng: e.lng,
-          customerId: e.userId,
+          phone: e.phone ?? null,
+          address: e.address ?? null,
           entries: [e],
         });
       }
     }
-    return [...map.values()];
-  }, [filteredEntries, sort]);
-
-  const keyToEntry = useMemo(() => {
-    const m = new Map<string, DeliveryBoardEntry>();
-    for (const e of filteredEntries) m.set(entryKeyOf(e), e);
-    return m;
+    return [...map.values()].sort((a, b) => a.customerName.localeCompare(b.customerName));
   }, [filteredEntries]);
-  const visibleSelectedIds = selectedIds.filter((id) => keyToEntry.has(id));
 
-  const confirmGroup = groups.find((g) => g.key === confirmGroupKey) ?? null;
-
-  const toggleSelect = (id: string, checked: boolean) => {
-    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((s) => s !== id)));
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    const sp = new URLSearchParams(searchParams);
+    sp.set('date', newDate);
+    sp.delete('slot');
+    setSearchParams(sp, { replace: true });
+    setDrawerEntry(null);
   };
 
-  const deliverEntries = async (targets: DeliveryBoardEntry[]) => {
-    let done = 0;
-    for (const entry of targets) {
-      const target = resolveTarget(entry);
-      try {
-        if (target.kind === 'order') {
-          await deliveriesApi.recordOrderOutcome(target.id, { status: 'delivered' });
-        } else {
-          await deliveriesApi.recordSubscriptionOutcome(target.id, {
-            status: 'delivered',
-            deliveryDate: date,
-            slot: entry.deliverySlot ?? undefined,
-          });
-        }
-        done += 1;
-      } catch (err) {
-        toast.error(getErrorMessage(err));
-        break;
-      }
-    }
-    queryClient.invalidateQueries({ queryKey: ['subscriptions', 'delivery-board'] });
-    queryClient.invalidateQueries({ queryKey: queryKeys.manifests.all() });
-    return done;
+  const handlePrevDate = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() - 1);
+    handleDateChange(toLocalDateStr(d));
   };
 
-  const handleBulkDeliver = async () => {
-    const targets = visibleSelectedIds
-      .map((k) => keyToEntry.get(k))
-      .filter((e): e is DeliveryBoardEntry => Boolean(e));
-    if (targets.length === 0) return;
-    setBulkLoading(true);
-    try {
-      const done = await deliverEntries(targets);
-      toast.success(`Delivered ${done} of ${targets.length}`);
-      setSelectedIds([]);
-    } finally {
-      setBulkLoading(false);
-    }
+  const handleNextDate = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + 1);
+    handleDateChange(toLocalDateStr(d));
   };
 
-  const handleConfirmGroup = async () => {
-    if (!confirmGroup) return;
-    const pending = confirmGroup.entries.filter(
-      (e) => (e.deliveryStatus ?? '').toLowerCase() === 'pending',
+  const handleToday = () => {
+    const t = todayLocal();
+    handleDateChange(t);
+  };
+
+  const handleSlotChange = (next: string) => {
+    setSlot(next);
+    const sp = new URLSearchParams(searchParams);
+    sp.set('slot', next);
+    setSearchParams(sp, { replace: true });
+  };
+
+  const handleStatusChange = (next: string) => {
+    setStatusFilter(next);
+    const sp = new URLSearchParams(searchParams);
+    if (next) sp.set('status', next); else sp.delete('status');
+    setSearchParams(sp, { replace: true });
+  };
+
+  const handleSearchChange = (v: string) => {
+    setSearch(v);
+    const sp = new URLSearchParams(searchParams);
+    if (v) sp.set('search', v); else sp.delete('search');
+    setSearchParams(sp, { replace: true });
+  };
+
+  const openCard = (entry: DeliveryBoardEntry) => {
+    setDrawerEntry(entry);
+  };
+
+  if (boardQuery.isLoading || sessionQuery.isLoading) {
+    return (
+      <div className="flex flex-col gap-4 p-3">
+        <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
+        </div>
+      </div>
     );
-    if (pending.length === 0) {
-      setConfirmGroupKey(null);
-      return;
-    }
-    setConfirming(true);
-    try {
-      const done = await deliverEntries(pending);
-      toast.success(`Delivered ${done} of ${pending.length} for ${confirmGroup.customerName}`);
-      setConfirmGroupKey(null);
-    } finally {
-      setConfirming(false);
-    }
-  };
+  }
+
+  if (boardQuery.isError) {
+    return (
+      <div className="p-3">
+        <ErrorState message={getErrorMessage(boardQuery.error)} onRetry={() => boardQuery.refetch()} />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Delivery board" />
+    <div className="flex flex-col gap-3 p-3 sm:p-4 lg:p-6 max-w-[620px] mx-auto">
+      {/* ── Date header ──────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <button
+          type="button"
+          onClick={handlePrevDate}
+          aria-label="Previous date"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+        </button>
 
-      {summary && (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Total', value: summary.total, icon: ClipboardList, colorClass: 'bg-slate-100 text-slate-600' },
-            { label: 'Remaining', value: summary.remainingDeliveries, icon: Clock, colorClass: 'bg-amber-100 text-amber-700' },
-            { label: 'Delivered', value: summary.delivered, icon: CheckCircle2, colorClass: 'bg-emerald-100 text-emerald-700' },
-          ].map((s) => (
-            <div key={s.label} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-card">
-              <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg', s.colorClass)}>
-                <s.icon className="size-3.5" aria-hidden />
-              </span>
-              <div>
-                <p className="text-[11px] text-slate-500">{s.label}</p>
-                <p className="text-sm font-semibold tabular-nums text-slate-900">{s.value}</p>
-              </div>
-            </div>
-          ))}
+        <button
+          onClick={() => {
+            setDatePickerOpen(true);
+            datePickerRef.current?.showPicker?.();
+          }}
+          aria-label="Selected date"
+          className={cn(
+            'flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 transition-colors',
+            'bg-slate-50 text-slate-900 hover:bg-slate-100',
+          )}
+        >
+          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
+            {new Date(date).toLocaleDateString('en-IN', { weekday: 'short' })}
+          </span>
+          <span className="text-sm font-semibold tracking-tight">
+            {new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+          </span>
+          {isToday && <span className="text-[10px] font-medium text-emerald-600">Today</span>}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleNextDate}
+          aria-label="Next date"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+        >
+          <ArrowRight className="size-4" aria-hidden />
+        </button>
+      </div>
+
+      {/* ── Evening gate cue ─────────────────────────────────────── */}
+      {eveningLocked && (
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs bg-amber-50 border border-amber-100 rounded-lg">
+          <span className="text-amber-600" aria-hidden="true">!</span>
+          <span className="text-amber-700">Evening deliveries start at 5:00 PM</span>
         </div>
       )}
 
+      {/* ── Filters + search ─────────────────────────────────────── */}
       <DeliveryFilters
-        filters={{ date, slot, type, status, area, search, sort }}
+        filters={{ date, slot, status: statusFilter, search }}
         onChange={(next) => {
-          if (
-            next.date !== date ||
-            next.slot !== slot ||
-            next.type !== type ||
-            next.status !== status ||
-            next.area !== area ||
-            next.search !== search
-          ) {
-            setSelectedIds([]);
+          if (next.date !== date) {
+            setDate(next.date);
+            handleDateChange(next.date);
           }
-          const sp = new URLSearchParams(searchParams);
-          const apply = (k: string, v: string, fallback: string) => {
-            if (v && v !== fallback) sp.set(k, v);
-            else sp.delete(k);
-          };
-          apply('date', next.date, '');
-          apply('slot', next.slot, 'morning');
-          apply('type', next.type, 'all');
-          apply('status', next.status, '');
-          apply('area', next.area, '');
-          apply('search', next.search, '');
-          apply('sort', next.sort, 'sequence');
-          setSearchParams(sp, { replace: true });
+          if (next.slot !== slot) handleSlotChange(next.slot);
+          if (next.status !== statusFilter) handleStatusChange(next.status);
+          if (next.search !== search) handleSearchChange(next.search);
         }}
-        areas={areasQuery.data ?? []}
       />
 
-      {boardQuery.isLoading ? (
-        <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full" />
-          ))}
-        </div>
-      ) : boardQuery.isError ? (
-        <ErrorState message={getErrorMessage(boardQuery.error)} onRetry={() => boardQuery.refetch()} />
-      ) : groups.length === 0 ? (
+      <Separator />
+
+      {/* ── Unconfirmed review entry ─────────────────────────────── */}
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Deliveries for {new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+        </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setUnconfirmedOpen(true)}
+          className="h-8 px-2 text-xs"
+        >
+          <RefreshCw className="mr-1 size-3.5" aria-hidden="true" />
+          Review unconfirmed
+        </Button>
+      </div>
+
+      {/* ── Delivery list ────────────────────────────────────────── */}
+      {groups.length === 0 ? (
         <EmptyState
           title="No deliveries"
-          message="No deliveries scheduled for this date and slot."
+          message={date === todayLocal() ? 'No deliveries scheduled for today.' : `No deliveries on ${new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`}
+          actionLabel={date !== todayLocal() ? 'Today' : undefined}
+          onAction={handleToday}
         />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
           {groups.map((g) => (
-            <CustomerGroup
-              key={g.key}
-              customerName={g.customerName}
-              phone={g.phone}
-              address={g.address}
-              areaName={g.areaName}
-              entries={g.entries}
-              onOutcome={(entry) => {
-                setActiveEntry(entry);
-                setOutcomeOpen(true);
-              }}
-              onConfirmAll={() => setConfirmGroupKey(g.key)}
-              onAddExtra={() => setExtraGroup(g)}
-              selectedIds={visibleSelectedIds}
-              onToggleSelect={toggleSelect}
-              confirming={confirming && confirmGroupKey === g.key}
-            />
+            <DeliveryCard key={g.key} group={g} onCardPress={(e) => setDrawerEntry(e)} eveningLocked={eveningLocked} />
           ))}
         </div>
       )}
 
-      <BulkActionsBar
-        count={visibleSelectedIds.length}
-        onDeliverAll={handleBulkDeliver}
-        onClear={() => setSelectedIds([])}
-        loading={bulkLoading}
-      />
-
-      <OutcomeSheet
-        entry={activeEntry}
-        date={date}
-        open={outcomeOpen}
-        onOpenChange={(open) => {
-          setOutcomeOpen(open);
-          if (!open) setActiveEntry(null);
+      {/* ── Hidden native date picker ────────────────────────────── */}
+      <input
+        ref={datePickerRef}
+        type="date"
+        value={date}
+        onChange={(e) => {
+          setDatePickerOpen(false);
+          handleDateChange(e.target.value);
         }}
+        hidden
       />
 
-      <CustomerConfirmDrawer
-        group={
-          confirmGroup
-            ? {
-                customerName: confirmGroup.customerName,
-                pendingCount: confirmGroup.entries.filter(
-                  (e) => (e.deliveryStatus ?? '').toLowerCase() === 'pending',
-                ).length,
-              }
-            : null
-        }
-        open={confirmGroupKey !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmGroupKey(null);
-        }}
-        onConfirm={handleConfirmGroup}
-        confirming={confirming}
-      />
-
-      <Sheet open={extraGroup !== null} onOpenChange={(open) => { if (!open) setExtraGroup(null); }}>
+      {/* ── Delivery details drawer (bottom sheet on mobile) ─────── */}
+      <Sheet open={drawerEntry !== null} onOpenChange={(open) => { if (!open) setDrawerEntry(null); }}>
         <SheetContent side="bottom">
-          <SheetHeader>
-            <SheetTitle>Add extra products</SheetTitle>
-          </SheetHeader>
-          <SheetBody>
-            {extraGroup && (
-              <ExtraProductsSection customerId={extraGroup.customerId} customerName={extraGroup.customerName} />
-            )}
-          </SheetBody>
+          {drawerEntry && (
+            <DeliveryDetailsDrawer entry={drawerEntry} date={date} onClose={() => setDrawerEntry(null)} />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Unconfirmed review ───────────────────────────────────── */}
+      <Sheet open={unconfirmedOpen} onOpenChange={setUnconfirmedOpen}>
+        <SheetContent side="bottom">
+          <UnconfirmedReview onClose={() => setUnconfirmedOpen(false)} />
         </SheetContent>
       </Sheet>
     </div>
