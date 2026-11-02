@@ -7,7 +7,6 @@ import { SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { StatusBadge } from '@/components/data/status-badge';
 import { formatNumber, getErrorMessage } from '@/lib/utils';
 import type { DeliveryBoardEntry, DeliveryBoardStatus, DeliveryItemOutcome } from '@/types/delivery';
-import { useDelivery } from '../hooks';
 import { useRecordDeliveryOutcome } from '../hooks';
 
 const FAILURE_REASONS = [
@@ -20,63 +19,85 @@ const FAILURE_REASONS = [
   { id: 'other', label: 'Other' },
 ] as const;
 
+export interface DrawerItemOutcome extends DeliveryItemOutcome {
+  uniqueItemId: string;
+  deliverySlot: 'morning' | 'evening';
+  entryRefId: string;
+  sourceEntry: DeliveryBoardEntry;
+}
+
 export function DeliveryDetailsDrawer({
   entry,
+  entries,
   date,
   onClose,
 }: {
-  entry: DeliveryBoardEntry;
+  entry?: DeliveryBoardEntry;
+  entries?: DeliveryBoardEntry[];
   date: string;
   onClose: () => void;
 }) {
+  const activeEntries = (entries && entries.length > 0) ? entries : (entry ? [entry] : []);
+  const firstEntry = activeEntries[0];
   const recordOutcome = useRecordDeliveryOutcome();
-  const deliveryQuery = useDelivery(entry.deliveryId ?? entry.id);
-  const [session, setSession] = useState<'morning' | 'evening' | null>(entry.deliverySlot ?? null);
-  const serverItems = deliveryQuery.data?.items ?? [];
-  const [items, setItems] = useState<DeliveryItemOutcome[]>(() => {
-    const fromEntry = (entry.items ?? []).map((it) => {
-      const scheduledQty = Number(it.quantity ?? 0);
-      const isPending = it.itemStatus === 'pending' || entry.deliveryStatus === 'pending';
-      const deliveredQty = isPending
-        ? (it.deliveredQuantity && it.deliveredQuantity > 0 ? Number(it.deliveredQuantity) : scheduledQty)
-        : Number(it.deliveredQuantity ?? 0);
 
-      return {
-        productId: it.productId,
-        variantId: it.variantId ?? undefined,
-        productName: it.productName,
-        variantLabel: it.variantLabel ?? undefined,
-        unit: it.unit ?? undefined,
-        quantity: scheduledQty,
-        unitPrice: it.unitPrice ?? 0,
+  const [items, setItems] = useState<DrawerItemOutcome[]>(() => {
+    return activeEntries.flatMap((e, entryIdx) => {
+      const slot = (e.deliverySlot ?? 'morning') as 'morning' | 'evening';
+      const refId = e.subscriptionId ?? e.orderId ?? e.id;
+      const isPending = e.deliveryStatus === 'pending';
+
+      if (e.items && e.items.length > 0) {
+        return e.items.map((it, itemIdx) => {
+          const scheduledQty = Number(it.quantity ?? 0);
+          const itemPending = it.itemStatus === 'pending' || isPending;
+          const deliveredQty = itemPending
+            ? (it.deliveredQuantity && it.deliveredQuantity > 0 ? Number(it.deliveredQuantity) : scheduledQty)
+            : Number(it.deliveredQuantity ?? 0);
+
+          return {
+            uniqueItemId: `${e.id}-${it.productId}-${itemIdx}`,
+            productId: it.productId,
+            variantId: it.variantId ?? undefined,
+            productName: it.productName,
+            variantLabel: it.variantLabel ?? undefined,
+            unit: it.unit ?? undefined,
+            quantity: scheduledQty,
+            unitPrice: it.unitPrice ?? 0,
+            deliveredQuantity: deliveredQty,
+            itemStatus: it.itemStatus,
+            failureReason: it.failureReason ?? undefined,
+            failureNotes: it.failureNotes ?? undefined,
+            deliverySlot: slot,
+            entryRefId: refId,
+            sourceEntry: e,
+          };
+        });
+      }
+
+      const defaultQty = Number(e.scheduledQuantity ?? e.quantity ?? 0);
+      const deliveredQty = isPending ? defaultQty : Number(e.actualQuantity ?? 0);
+
+      return [{
+        uniqueItemId: `${e.id}-${e.productId ?? e.id}-${entryIdx}`,
+        productId: e.productId ?? e.id,
+        variantId: undefined,
+        productName: e.productName ?? 'Delivery',
+        variantLabel: undefined,
+        unit: e.unit ?? undefined,
+        quantity: defaultQty,
+        unitPrice: Number(e.pricePerPacket ?? 0),
         deliveredQuantity: deliveredQty,
-        itemStatus: it.itemStatus,
-        failureReason: it.failureReason ?? undefined,
-        failureNotes: it.failureNotes ?? undefined,
-      };
+        itemStatus: e.deliveryStatus as DeliveryBoardStatus,
+        failureReason: undefined,
+        failureNotes: undefined,
+        deliverySlot: slot,
+        entryRefId: refId,
+        sourceEntry: e,
+      }];
     });
-    if (fromEntry.length > 0) return fromEntry;
-
-    const defaultQty = Number(entry.scheduledQuantity ?? entry.quantity ?? 0);
-    const isPending = entry.deliveryStatus === 'pending';
-    const deliveredQty = isPending
-      ? defaultQty
-      : Number(entry.actualQuantity ?? 0);
-
-    return [{
-      productId: entry.productId ?? entry.id,
-      variantId: undefined,
-      productName: entry.productName ?? 'Delivery',
-      variantLabel: undefined,
-      unit: entry.unit ?? undefined,
-      quantity: defaultQty,
-      unitPrice: Number(entry.pricePerPacket ?? 0),
-      deliveredQuantity: deliveredQty,
-      itemStatus: entry.deliveryStatus as DeliveryBoardStatus,
-      failureReason: undefined,
-      failureNotes: undefined,
-    }];
   });
+
   const [failSectionOpen, setFailSectionOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [otherNote, setOtherNote] = useState('');
@@ -88,129 +109,180 @@ export function DeliveryDetailsDrawer({
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
   const [paymentAmount, setPaymentAmount] = useState<string>('');
 
-  // Sync items from server when entry/detail loads
-  useEffect(() => {
-    if (serverItems.length > 0) {
-      setItems(
-        serverItems.map((it: any) => {
-          const scheduledQty = Number(it.quantity ?? 0);
-          const isPending = it.itemStatus === 'pending' || entry.deliveryStatus === 'pending';
-          const deliveredQty = isPending
-            ? (Number(it.deliveredQuantity) > 0 ? Number(it.deliveredQuantity) : scheduledQty)
-            : Number(it.deliveredQuantity ?? 0);
+  if (!firstEntry) return null;
 
-          return {
-            productId: it.productId,
-            variantId: it.variantId ?? undefined,
-            productName: it.productName,
-            variantLabel: it.variantLabel ?? undefined,
-            unit: it.unit ?? undefined,
-            quantity: scheduledQty,
-            unitPrice: Number(it.unitPrice ?? 0),
-            deliveredQuantity: deliveredQty,
-            itemStatus: it.itemStatus,
-            failureReason: it.failureReason ?? undefined,
-            failureNotes: it.failureNotes ?? undefined,
-          };
-        }),
-      );
-    }
-  }, [serverItems]);
+  const customerName = firstEntry.customerName || 'Unknown customer';
+  const phone = firstEntry.phone ?? null;
+  const address = firstEntry.address ?? null;
 
-  const customerName = entry.customerName || 'Unknown customer';
-  const phone = entry.phone ?? null;
-  const address = entry.address ?? null;
-
-  const handleQtyChange = (productId: string, delta: number) => {
+  const handleQtyChange = (uniqueItemId: string, delta: number) => {
+    setError(null);
     setItems((prev) =>
-      prev.map((it) =>
-        it.productId === productId
-          ? { ...it, deliveredQuantity: Math.max(0, it.deliveredQuantity + delta) }
-          : it,
-      ),
+      prev.map((it) => {
+        if (it.uniqueItemId !== uniqueItemId) return it;
+        const newDelivered = Math.max(0, it.deliveredQuantity + delta);
+        const itemStatus: DeliveryBoardStatus =
+          newDelivered === 0
+            ? 'failed'
+            : newDelivered < it.quantity
+              ? 'partial'
+              : 'delivered';
+        return {
+          ...it,
+          deliveredQuantity: newDelivered,
+          itemStatus,
+        };
+      }),
     );
   };
 
-  const handleDirectQty = (productId: string, value: string) => {
+  const handleDirectQty = (uniqueItemId: string, value: string) => {
+    setError(null);
     const n = Number(value);
     setItems((prev) =>
-      prev.map((it) => (it.productId === productId ? { ...it, deliveredQuantity: n >= 0 ? n : 0 } : it)),
+      prev.map((it) => {
+        if (it.uniqueItemId !== uniqueItemId) return it;
+        const newDelivered = n >= 0 ? n : 0;
+        const itemStatus: DeliveryBoardStatus =
+          newDelivered === 0
+            ? 'failed'
+            : newDelivered < it.quantity
+              ? 'partial'
+              : 'delivered';
+        return {
+          ...it,
+          deliveredQuantity: newDelivered,
+          itemStatus,
+        };
+      }),
     );
   };
 
   const handleMarkAllDelivered = () => {
-    // Prevent delivering an already delivered delivery
     if (isAlreadyDelivered) {
-      setError('This delivery has already been completed and cannot be delivered again.');
+      setError('All deliveries for this customer have already been completed.');
       return;
     }
     setError(null);
-    setItems((prev) => prev.map((it) => ({ ...it, itemStatus: 'delivered' as DeliveryBoardStatus, deliveredQuantity: it.quantity })));
+    setSelectedReason(null);
+    setOtherNote('');
+    setFailSectionOpen(false);
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        itemStatus: 'delivered' as DeliveryBoardStatus,
+        deliveredQuantity: it.quantity,
+        failureReason: undefined,
+        failureNotes: undefined,
+      })),
+    );
   };
 
   const handleMarkAllFailed = () => {
-    // Prevent failing an already delivered delivery
     if (isAlreadyDelivered) {
-      setError('This delivery has already been completed and cannot be failed.');
+      setError('All deliveries for this customer have already been completed and cannot be failed.');
       return;
     }
     setError(null);
-    setItems((prev) => prev.map((it) => ({ ...it, itemStatus: 'failed' as DeliveryBoardStatus, deliveredQuantity: 0 })));
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        itemStatus: 'failed' as DeliveryBoardStatus,
+        deliveredQuantity: 0,
+        failureReason: selectedReason || it.failureReason,
+        failureNotes: otherNote || it.failureNotes,
+      })),
+    );
     setFailSectionOpen(true);
   };
 
-  const handleConfirm = async (outcomeId: string) => {
+  const handleConfirm = async () => {
     setError(null);
+
+    const isAnyFailed = items.some((it) => it.itemStatus === 'failed');
+    if (isAnyFailed) {
+      const reasonToUse =
+        selectedReason === 'other'
+          ? (otherNote.trim() || 'Other')
+          : (FAILURE_REASONS.find((r) => r.id === selectedReason)?.label || selectedReason);
+
+      if (!reasonToUse) {
+        setError('Please select a failure reason before confirming.');
+        setFailSectionOpen(true);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
-      const itemsPayload = items.map((it) => ({
-        productId: it.productId,
-        variantId: it.variantId ?? '',
-        productName: it.productName,
-        variantLabel: it.variantLabel ?? '',
-        unit: it.unit ?? '',
-        quantity: it.quantity,
-        unitPrice: it.unitPrice,
-        deliveredQuantity: it.deliveredQuantity,
-        itemStatus: it.itemStatus,
-        failureReason: it.failureReason ?? '',
-        failureNotes: it.failureNotes ?? '',
-      }));
+      const resolvedReason =
+        selectedReason === 'other'
+          ? (otherNote.trim() || 'Other')
+          : (FAILURE_REASONS.find((r) => r.id === selectedReason)?.label || selectedReason || '');
 
-      const idempotencyKey = `subscription-pending:${entry.subscriptionId}:${date}:${session ?? entry.deliverySlot ?? 'morning'}`;
+      // Group items by source entry so we record each delivery accurately
+      for (const e of activeEntries) {
+        const entryItems = items.filter((it) => it.sourceEntry.id === e.id);
+        if (entryItems.length === 0) continue;
 
-      const paymentReceivedPayload =
-        collectPayment && Number(paymentAmount) > 0
-          ? {
-              amount: Number(paymentAmount),
-              paymentMethod,
-            }
-          : null;
+        const isAllEntryDelivered = entryItems.every((it) => it.itemStatus === 'delivered');
+        const hasEntryFailures = entryItems.some((it) => it.itemStatus === 'failed');
+        const hasEntryPartials = entryItems.some((it) => it.itemStatus === 'partial');
 
-      await recordOutcome.mutateAsync({
-        entry: {
-          userId: entry.userId,
-          type: entry.type as 'subscription' | 'order',
-          subscriptionId: entry.subscriptionId ?? undefined,
-          orderId: entry.orderId ?? undefined,
-          deliverySlot: session ?? entry.deliverySlot ?? undefined,
-          id: entry.id,
-          deliveryId: entry.deliveryId ?? undefined,
-          scheduledQuantity: entry.scheduledQuantity,
-        },
-        data: {
-          deliveryDate: date,
-          status: outcomeId as any,
-          actualQuantity: items.reduce((s, it) => s + it.deliveredQuantity, 0) || undefined,
-          items: itemsPayload,
-          paymentMode: collectPayment ? 'pay_at_delivery' : 'subscription_ledger',
-          paymentReceived: paymentReceivedPayload,
-          reason: '',
-          notes: '',
-          idempotencyKey,
-          expectedVersion: undefined,
-        },
-      });
+        const entryOutcomeStatus =
+          isAllEntryDelivered ? 'delivered' : hasEntryFailures ? 'failed' : hasEntryPartials ? 'partial' : 'pending';
+
+        const itemsPayload = entryItems.map((it) => ({
+          productId: it.productId,
+          variantId: it.variantId ?? '',
+          productName: it.productName,
+          variantLabel: it.variantLabel ?? '',
+          unit: it.unit ?? '',
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          deliveredQuantity: it.deliveredQuantity,
+          itemStatus: it.itemStatus,
+          failureReason: it.itemStatus === 'failed' ? (it.failureReason || resolvedReason) : '',
+          failureNotes: it.itemStatus === 'failed' ? (it.failureNotes || otherNote || '') : '',
+        }));
+
+        const refId = e.subscriptionId ?? e.orderId ?? e.id;
+        const idempotencyKey = `outcome:${e.type ?? 'subscription'}:${refId}:${date}:${e.deliverySlot ?? 'morning'}:${entryOutcomeStatus}`;
+
+        const paymentReceivedPayload =
+          collectPayment && Number(paymentAmount) > 0
+            ? {
+                amount: Number(paymentAmount),
+                paymentMethod,
+              }
+            : null;
+
+        await recordOutcome.mutateAsync({
+          entry: {
+            userId: e.userId,
+            type: e.type as 'subscription' | 'order',
+            subscriptionId: e.subscriptionId ?? undefined,
+            orderId: e.orderId ?? undefined,
+            deliverySlot: e.deliverySlot ?? undefined,
+            id: e.id,
+            deliveryId: e.deliveryId ?? undefined,
+            scheduledQuantity: e.scheduledQuantity,
+          },
+          data: {
+            deliveryDate: date,
+            status: entryOutcomeStatus as any,
+            actualQuantity: entryItems.reduce((s, it) => s + it.deliveredQuantity, 0),
+            items: itemsPayload,
+            paymentMode: collectPayment ? 'pay_at_delivery' : 'subscription_ledger',
+            paymentReceived: paymentReceivedPayload,
+            reason: resolvedReason,
+            notes: otherNote || '',
+            idempotencyKey,
+            expectedVersion: undefined,
+          },
+        });
+      }
+
       onClose();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -223,15 +295,21 @@ export function DeliveryDetailsDrawer({
   const hasFailures = items.some((it) => it.itemStatus === 'failed');
   const hasPartials = items.some((it) => it.itemStatus === 'partial');
 
-  const overallItemStatus: string =
+  const overallStatus =
     isAllDelivered ? 'delivered' : hasFailures ? 'failed' : hasPartials ? 'partial' : 'pending';
 
-  const isAlreadyDelivered = overallItemStatus === 'delivered';
+  const isAlreadyDelivered = activeEntries.every(
+    (e) => (e.deliveryStatus ?? '').toLowerCase() === 'delivered' || (e.deliveryStatus ?? '').toLowerCase() === 'skipped',
+  );
 
   const canConfirm = items.length > 0 && (isAllDelivered || hasPartials || hasFailures) && !isAlreadyDelivered;
 
+  // Group items by slot for crystal-clear slot-wise separation
+  const morningItems = items.filter((it) => it.deliverySlot === 'morning');
+  const eveningItems = items.filter((it) => it.deliverySlot === 'evening');
+
   return (
-    <div className="lg:w-[440px] max-h-full flex flex-col">
+    <div className="lg:w-[460px] max-h-full flex flex-col">
       <SheetHeader className="pb-2">
         <SheetTitle className="text-sm font-semibold">Delivery details</SheetTitle>
       </SheetHeader>
@@ -244,7 +322,7 @@ export function DeliveryDetailsDrawer({
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Customer</span>
               <h3 className="text-sm font-semibold text-slate-900 leading-tight">{customerName}</h3>
             </div>
-            <StatusBadge status={entry.deliveryStatus} className="text-[10px]" />
+            <StatusBadge status={overallStatus} className="text-[10px]" />
           </div>
           {phone && (
             <a href={`tel:${phone}`} className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900">
@@ -258,89 +336,122 @@ export function DeliveryDetailsDrawer({
               <span className="leading-relaxed">{address}</span>
             </div>
           )}
-          <div className="mt-1.5 flex items-center gap-2 text-[10px] font-medium text-slate-500">
-            <Badge variant="outline" className="px-2 py-0.5">{session ?? entry.deliverySlot ?? 'morning'}</Badge>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: overallItemStatus === 'delivered' ? '#10b981' : overallItemStatus === 'failed' ? '#f43f5e' : '#f59e0b' }} />
-              {overallItemStatus.charAt(0).toUpperCase() + overallItemStatus.slice(1)}
+          <div className="mt-2 flex items-center gap-2 text-[10px] font-medium text-slate-500">
+            {morningItems.length > 0 && (
+              <Badge variant="outline" className="px-2 py-0.5 border-amber-200 text-amber-800 bg-amber-50">
+                Morning ({morningItems.length})
+              </Badge>
+            )}
+            {eveningItems.length > 0 && (
+              <Badge variant="outline" className="px-2 py-0.5 border-indigo-200 text-indigo-800 bg-indigo-50">
+                Evening ({eveningItems.length})
+              </Badge>
+            )}
+            <span className="flex items-center gap-1 ml-auto font-medium">
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  backgroundColor:
+                    overallStatus === 'delivered' ? '#10b981' : overallStatus === 'failed' ? '#f43f5e' : '#f59e0b',
+                }}
+              />
+              {overallStatus.charAt(0).toUpperCase() + overallStatus.slice(1)}
             </span>
           </div>
         </div>
 
-        {/* ── Products ─────────────────────────────────────────── */}
-        <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Products</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-400">{items.length} item{items.length === 1 ? '' : 's'}</span>
-              <span className="text-xs font-bold text-slate-900">Total: &#8377;{formatNumber(items.reduce((acc, it) => acc + (it.deliveredQuantity || 0) * (it.unitPrice || 0), 0))}</span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            {items.map((it) => (
-              <div key={it.productId} className="flex min-w-0 items-center justify-between gap-2 px-1.5 py-1 rounded border border-slate-100 bg-slate-50/50">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1 text-xs text-slate-700">
-                    <span className="font-medium truncate flex-1">{it.productName}</span>
-                    {it.variantLabel && <Badge variant="outline" className="text-[9px] px-1.5 py-0">{it.variantLabel}</Badge>}
+        {/* ── Products Grouped by Delivery Slot ────────────────── */}
+        <div className="space-y-3">
+          {[
+            { label: 'Morning Delivery', slot: 'morning' as const, slotItems: morningItems, badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' },
+            { label: 'Evening Delivery', slot: 'evening' as const, slotItems: eveningItems, badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+          ]
+            .filter((group) => group.slotItems.length > 0)
+            .map((group) => {
+              const groupTotal = group.slotItems.reduce(
+                (acc, it) => acc + (it.deliveredQuantity || 0) * (it.unitPrice || 0),
+                0,
+              );
+              return (
+                <div key={group.slot} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${group.badgeClass}`}>
+                        {group.label}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {group.slotItems.length} product{group.slotItems.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">
+                      ₹{formatNumber(groupTotal)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
-                    <span className="text-slate-300" aria-hidden="true">·</span>
-                    {entry.type === 'subscription' ? (
-                      <>
-                        <span className="font-semibold text-emerald-700">₹{formatNumber(it.unitPrice || 0)}</span>
-                        <span className="text-slate-400" aria-hidden="true">|</span>
-                        <span className="font-semibold text-slate-700">{formatNumber(it.quantity)} {it.unit}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-semibold text-slate-700">₹{formatNumber(it.unitPrice || 0)}</span>
-                        <span className="text-slate-400" aria-hidden="true">|</span>
-                        <span className="font-semibold text-slate-700">{formatNumber(it.quantity)} {it.unit}</span>
-                      </>
-                    )}
+
+                  <div className="space-y-1.5">
+                    {group.slotItems.map((it) => (
+                      <div
+                        key={it.uniqueItemId}
+                        className="flex min-w-0 items-center justify-between gap-2 px-2 py-1.5 rounded-md border border-slate-100 bg-slate-50/70"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-800">
+                            <span className="font-semibold truncate flex-1">{it.productName}</span>
+                            {it.variantLabel && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
+                                {it.variantLabel}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                            <span className="font-semibold text-emerald-700">₹{formatNumber(it.unitPrice || 0)}</span>
+                            <span className="text-slate-300" aria-hidden="true">|</span>
+                            <span>Scheduled: <strong className="text-slate-700">{formatNumber(it.quantity)} {it.unit ?? ''}</strong></span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 min-w-10 text-right">
+                            ₹{formatNumber((it.deliveredQuantity || 0) * (it.unitPrice || 0))}
+                          </span>
+                          <div className="flex items-center gap-1 ml-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQtyChange(it.uniqueItemId, -0.5)}
+                              className="h-6 w-6 p-0 text-xs font-semibold"
+                              disabled={it.deliveredQuantity <= 0}
+                            >
+                              −
+                            </Button>
+                            <Input
+                              type="number"
+                              value={it.deliveredQuantity}
+                              onChange={(e) => handleDirectQty(it.uniqueItemId, e.target.value)}
+                              className="h-6 w-11 text-[11px] text-center text-slate-900 font-medium px-0.5"
+                              step="0.5"
+                              min="0"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQtyChange(it.uniqueItemId, 0.5)}
+                              className="h-6 w-6 p-0 text-xs font-semibold"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-900">₹{formatNumber((it.deliveredQuantity || 0) * (it.unitPrice || 0))}</span>
-                  <div className="flex items-center gap-1.5 ml-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQtyChange(it.productId, -0.5)}
-                      className="h-6 w-6 p-0 text-xs"
-                      disabled={it.deliveredQuantity <= 0}
-                    >
-                      −
-                    </Button>
-                    <Input
-                      type="number"
-                      value={it.deliveredQuantity}
-                      onChange={(e) => handleDirectQty(it.productId, e.target.value)}
-                      className="h-5 w-10 text-[10px] text-center text-slate-900"
-                      step="0.5"
-                      min="0"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQtyChange(it.productId, 0.5)}
-                      className="h-6 w-6 p-0 text-xs"
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
         </div>
 
         {/* ── Actions ──────────────────────────────────────────── */}
         <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Complete delivery</span>
           <div className="grid grid-cols-2 gap-1.5">
             <Button
               variant={isAllDelivered ? 'default' : 'outline'}
@@ -369,7 +480,9 @@ export function DeliveryDetailsDrawer({
 
           {failSectionOpen && (
             <div className="mt-3 space-y-2 pt-2 border-t border-slate-100">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Failure reason</span>
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                Failure reason
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 {FAILURE_REASONS.map((r) => (
                   <Button
@@ -390,7 +503,9 @@ export function DeliveryDetailsDrawer({
               </div>
               {selectedReason === 'other' && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Notes</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">
+                    Notes
+                  </span>
                   <Input
                     value={otherNote}
                     onChange={(e) => setOtherNote(e.target.value)}
@@ -459,11 +574,11 @@ export function DeliveryDetailsDrawer({
 
           <div className="mt-3">
             <Button
-              onClick={() => handleConfirm(overallItemStatus)}
+              onClick={handleConfirm}
               disabled={isSaving || !canConfirm}
               className="w-full h-9 text-xs font-semibold disabled:opacity-50"
             >
-              {isSaving ? 'Saving…' : `Confirm ${overallItemStatus}`}
+              {isSaving ? 'Saving…' : `Confirm ${overallStatus}`}
             </Button>
             {error && (
               <div className="mt-1 flex items-center gap-1 text-[10px] text-rose-600">

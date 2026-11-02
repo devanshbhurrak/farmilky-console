@@ -36,14 +36,6 @@ export function useDeliveryPerformance() {
   });
 }
 
-export function useDeliveryStats() {
-  return useQuery({
-    queryKey: queryKeys.admin.deliveryStats(),
-    queryFn: async () => unwrapOrThrow(await dashboardApi.deliveryStats()),
-    staleTime: STALE,
-  });
-}
-
 export function useProfitStats() {
   return useQuery({
     queryKey: queryKeys.admin.profitStats(),

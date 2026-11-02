@@ -36,7 +36,6 @@ export interface NavItem {
 }
 
 export const NAV_GROUPS: { key: NonNullable<NavItem['group']>; label: string }[] = [
-  { key: 'core', label: 'Core' },
   { key: 'people', label: 'People' },
   { key: 'finance', label: 'Finance' },
   { key: 'operations', label: 'Operations' },
@@ -46,10 +45,11 @@ export const NAV_GROUPS: { key: NonNullable<NavItem['group']>; label: string }[]
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Home', path: '/', icon: LayoutDashboard, adminOnly: true, bottomNav: true, group: 'core' },
-  { label: 'Deliveries', path: '/deliveries', icon: Truck, permission: 'delivery_board.view', bottomNav: true, group: 'core' },
-  { label: 'Orders', path: '/orders', icon: ShoppingCart, adminOnly: true, bottomNav: true, group: 'core' },
-  { label: 'Subscriptions', path: '/subscriptions', icon: Repeat, adminOnly: true, bottomNav: true, group: 'core' },
-  { label: 'Customers', path: '/customers', icon: Users, adminOnly: true, group: 'people' },
+  { label: 'Deliveries', path: '/deliveries', icon: Truck, permission: 'delivery_board.view', bottomNav: true, group: 'operations' },
+  { label: 'Collection', path: '/milk-collections', icon: Milk, adminOnly: true, bottomNav: true, group: 'operations' },
+  { label: 'Customers', path: '/customers', icon: Users, adminOnly: true, bottomNav: true, group: 'people' },
+  { label: 'Orders', path: '/orders', icon: ShoppingCart, adminOnly: true, group: 'operations' },
+  { label: 'Subscriptions', path: '/subscriptions', icon: Repeat, adminOnly: true, group: 'operations' },
   { label: 'Products', path: '/products', icon: Package, adminOnly: true, group: 'operations' },
   { label: 'Manifests', path: '/manifests', icon: ClipboardList, adminOnly: true, group: 'operations' },
   { label: 'My Route', path: '/agent', icon: Truck, permission: 'manifest.view_today', group: 'operations' },
@@ -60,7 +60,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Areas', path: '/areas', icon: MapPin, adminOnly: true, group: 'operations' },
   { label: 'Agents', path: '/agents', icon: UserCog, adminOnly: true, group: 'people' },
   { label: 'Suppliers', path: '/suppliers', icon: Users, adminOnly: true, group: 'people' },
-  { label: 'Milk Collection', path: '/milk-collections', icon: Milk, adminOnly: true, group: 'operations' },
   { label: 'Complaints', path: '/complaints', icon: MessageSquareWarning, adminOnly: true, group: 'support' },
   { label: 'Returns', path: '/returns', icon: Undo2, adminOnly: true, group: 'support' },
   { label: 'Holidays', path: '/holidays', icon: CalendarOff, adminOnly: true, group: 'support' },

@@ -130,8 +130,8 @@ export function SubscriptionForm({
       productId: defaultValues?.productId ?? '',
       variantId: defaultValues?.variantId ?? undefined,
       quantityPerDelivery: initialSlots.primaryQty,
-      customPrice: defaultValues?.customPrice ?? defaultValues?.pricePerUnit ?? 0,
-      startDate: defaultValues?.startDate ?? todayLocal(),
+      customPrice: defaultValues?.customPrice ?? defaultValues?.pricePerUnit ?? undefined,
+      startDate: defaultValues?.startDate ? defaultValues.startDate.slice(0, 10) : todayLocal(),
       deliverySchedule: defaultValues?.deliverySchedule ?? 'daily',
       customDays: defaultValues?.customDays ?? [],
       deliverySlot: initialSlots.slots[0],
@@ -140,11 +140,12 @@ export function SubscriptionForm({
     },
   });
 
-  const { register, handleSubmit, watch, setValue } = form;
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
 
   const products = productsQuery.data ?? [];
   const customers = customersQuery.data ?? [];
 
+  const customerId = watch('userId');
   const productId = watch('productId');
   const variantId = watch('variantId');
   const quantityPerDelivery = watch('quantityPerDelivery');
@@ -201,7 +202,7 @@ export function SubscriptionForm({
   const setSlotQuantity = (slot: SlotOption, value: string) => {
     const qty = value === '' ? undefined : Number(value);
     setValue('slotQuantities', { ...slotQuantities, [slot]: qty }, { shouldValidate: true });
-    if (slot === selectedSlots[0] && qty !== undefined && qty >= 1) {
+    if (slot === selectedSlots[0] && qty !== undefined && qty >= 0.001) {
       setValue('quantityPerDelivery', qty, { shouldValidate: true });
     }
   };
@@ -220,37 +221,35 @@ export function SubscriptionForm({
         onSubmit({
           ...v,
           userId: fixedCustomerId ?? v.userId,
-          quantityPerDelivery: total >= 1 ? total : v.quantityPerDelivery,
+          quantityPerDelivery: total >= 0.001 ? total : v.quantityPerDelivery,
           deliverySlot: slots[0] ?? v.deliverySlot,
           slots,
           slotQuantities: slotQtyMap,
         });
       })}
       id="subscription-form"
-      className="form-stack flex flex-col gap-4"
+      className="form-stack flex flex-col gap-4 text-slate-800"
     >
       {!fixedCustomerId && (
-        <div className="form-group">
-          <label className="block text-xs font-medium text-slate-700">Customer</label>
+        <FormField label="Customer" required error={errors.userId?.message}>
           {customersQuery.isLoading ? (
-            <p className="text-sm text-slate-500">Loading customers…</p>
+            <p className="text-xs text-slate-500">Loading customers…</p>
           ) : (
             <SearchableSelect
               options={customers.map((c) => {
                 const name = getName(c);
                 return { id: getId(c), label: c.phone ? `${name} · ${c.phone}` : name };
               })}
-              value={watch('userId')}
+              value={customerId}
               onChange={(id) => setValue('userId', id, { shouldValidate: true })}
               placeholder="Search customer by name or phone…"
               onSearch={setCustomerSearch}
             />
           )}
-        </div>
+        </FormField>
       )}
 
-      <div className="form-group">
-        <label className="block text-xs font-medium text-slate-700">Product</label>
+      <FormField label="Product" required error={errors.productId?.message}>
         <Select aria-label="Product" value={productId} onChange={(e) => handleProductChange(e.target.value)}>
           <option value="">{productsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
           {products.map((p) => (
@@ -259,11 +258,10 @@ export function SubscriptionForm({
             </option>
           ))}
         </Select>
-      </div>
+      </FormField>
 
       {variants.length > 0 && (
-        <div className="form-group">
-          <label className="block text-xs font-medium text-slate-700">Variant</label>
+        <FormField label="Variant">
           <Select value={variantId ?? ''} onChange={(e) => {
             const vid = e.target.value || undefined;
             const variant = vid ? variants.find((v) => variantIdOf(v, variants.indexOf(v)) === vid) : null;
@@ -280,14 +278,48 @@ export function SubscriptionForm({
               );
             })}
           </Select>
-        </div>
+        </FormField>
       )}
 
-      <div className="form-row grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Slots selection */}
+      <div className="flex flex-col gap-1.5">
+        <label className="block text-xs font-semibold text-slate-700">Delivery Slots</label>
+        <div className="grid grid-cols-2 gap-2">
+          {SLOT_OPTIONS.map((slot) => {
+            const active = selectedSlots.includes(slot);
+            return (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => toggleSlot(slot)}
+                className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold transition-all ${
+                  active
+                    ? 'border-primary-600 bg-primary-50 text-primary-900 shadow-sm'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-pressed={active}
+              >
+                {slotLabel(slot)} Slot
+              </button>
+            );
+          })}
+        </div>
+        {errors.slots?.message && (
+          <p className="text-xs text-red-600">{errors.slots.message}</p>
+        )}
+      </div>
+
+      {/* Quantities per slot or single slot */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {selectedSlots.length > 1 ? (
           <>
             {selectedSlots.map((slot) => (
-              <FormField key={slot} label={`${slotLabel(slot)} qty / delivery`} required>
+              <FormField
+                key={slot}
+                label={`${slotLabel(slot)} Qty / Delivery`}
+                required
+                error={errors.slotQuantities?.[slot]?.message}
+              >
                 <Input
                   type="number"
                   min={0.001}
@@ -299,93 +331,78 @@ export function SubscriptionForm({
             ))}
           </>
         ) : (
-          <div className="form-group">
-            <label className="block text-xs font-medium text-slate-700">Qty / delivery</label>
+          <FormField label="Qty / Delivery" required error={errors.quantityPerDelivery?.message}>
             <Input type="number" min={0.001} step={0.001} {...register('quantityPerDelivery')} />
-          </div>
+          </FormField>
         )}
-        <div className="form-group">
-          <label className="block text-xs font-medium text-slate-700 flex items-center gap-1">
-            Price per Unit
-            {isCustomPrice && <span className="price-custom-badge text-[10px] font-bold bg-warning-bg border-warning/20 text-warning px-1.5 py-0.5 rounded-full">CUSTOM</span>}
-          </label>
+
+        <FormField label="Price per Unit" error={errors.customPrice?.message}>
           <div className="flex items-center gap-2">
             <Input type="number" min={0.01} step={0.01} {...register('customPrice')} />
-            {selectedProduct && isCustomPrice && <span className="text-[10px] text-slate-500">Default {formatCurrency(defaultPrice)}</span>}
+            {isCustomPrice && (
+              <span className="shrink-0 text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded">
+                CUSTOM
+              </span>
+            )}
           </div>
           {selectedProduct && (
-            <p className="mt-1 text-xs text-slate-500">
-              {unitHint
-                ? `Standard rate: ${formatCurrency(defaultPrice)}/${unitHint}`
-                : `Standard rate: ${formatCurrency(defaultPrice)}`}
-              {isCustomPrice && ' — custom rate will override'}
+            <p className="mt-1 text-[11px] text-slate-500">
+              Standard: {formatCurrency(defaultPrice)}{unitHint ? `/${unitHint}` : ''}
+              {isCustomPrice ? ' (custom price will override)' : ''}
             </p>
           )}
-        </div>
+        </FormField>
       </div>
 
+      {/* Summary KPI Banner */}
       {selectedProduct && totalQtyPerDelivery > 0 && deliveryTotal > 0 && (
-        <div className="sub-preview-banner rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          <span className="sub-preview-label text-slate-500">Daily total</span>
-          <strong className="sub-preview-value text-slate-900 font-semibold">
-            {`₹${deliveryTotal.toFixed(2)}/day`}
+        <div className="flex items-center justify-between rounded-lg border border-primary-200 bg-primary-50/50 px-3.5 py-2.5 text-xs">
+          <span className="font-semibold text-primary-900 uppercase tracking-wider text-[11px]">Daily Cost:</span>
+          <strong className="text-sm font-extrabold text-primary-900">
+            {formatCurrency(deliveryTotal)} / day
           </strong>
         </div>
       )}
 
-      <div className="form-group">
-        <label className="block text-xs font-medium text-slate-700">Start Date</label>
+      <FormField label="Start Date" required error={errors.startDate?.message}>
         <Input type="date" {...register('startDate')} />
-      </div>
+      </FormField>
 
-      <div className="form-group">
-        <label className="block text-xs font-medium text-slate-700">Delivery Schedule</label>
+      <FormField label="Delivery Schedule" required error={errors.deliverySchedule?.message}>
         <Select {...register('deliverySchedule')}>
           <option value="daily">Daily</option>
           <option value="alternate">Alternate Days</option>
           <option value="weekly">Weekly</option>
-          <option value="custom">Custom</option>
+          <option value="custom">Custom Days</option>
         </Select>
-      </div>
+      </FormField>
 
       {schedule === 'custom' && (
-        <div className="form-group">
-          <label className="block text-xs font-medium text-slate-700">Custom Days</label>
-          <div className="days-selector flex flex-wrap gap-2">
-            {WEEK_DAYS.map((day) => (
-              <label key={day} className="day-chip flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                <Checkbox checked={customDays.includes(day)} onChange={() => toggleDay(day)} />
-                <span>{day.slice(0, 3)}</span>
-              </label>
-            ))}
+        <FormField label="Custom Days" required error={errors.customDays?.message}>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {WEEK_DAYS.map((day) => {
+              const active = customDays.includes(day);
+              return (
+                <label
+                  key={day}
+                  className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    active ? 'border-primary-600 bg-primary-50 text-primary-900 shadow-sm' : 'border-slate-300 bg-white text-slate-700'
+                  }`}
+                >
+                  <Checkbox checked={active} onChange={() => toggleDay(day)} />
+                  <span>{day.slice(0, 3)}</span>
+                </label>
+              );
+            })}
           </div>
-        </div>
+        </FormField>
       )}
 
-      <div className="form-group">
-        <label className="block text-xs font-medium text-slate-700">Delivery Slots</label>
-        <div className="flex gap-2">
-          {SLOT_OPTIONS.map((slot) => {
-            const active = selectedSlots.includes(slot);
-            return (
-              <button
-                key={slot}
-                type="button"
-                onClick={() => toggleSlot(slot)}
-                className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  active ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                }`} aria-pressed={active}
-              >
-                {slotLabel(slot)}
-              </button>
-            );
-          })}
-        </div>
+      <div className="pt-2">
+        <Button type="submit" loading={submitting} className="min-h-11 w-full text-sm font-bold">
+          Save Subscription
+        </Button>
       </div>
-
-      <Button type="submit" loading={submitting} className="min-h-11 w-full">
-        Save subscription
-      </Button>
     </form>
   );
 }

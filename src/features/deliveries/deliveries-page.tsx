@@ -30,7 +30,7 @@ export default function DeliveriesPage() {
   const [slot, setSlot] = useState(searchParams.get('slot') || 'all');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [search, setSearch] = useState(searchParams.get('search') || '');
-  const [drawerEntry, setDrawerEntry] = useState<DeliveryBoardEntry | null>(null);
+  const [drawerEntries, setDrawerEntries] = useState<DeliveryBoardEntry[] | null>(null);
   const [unconfirmedOpen, setUnconfirmedOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
@@ -40,7 +40,7 @@ export default function DeliveriesPage() {
     queryKey: queryKeys.deliveries.sessionState(date),
     queryFn: async () => {
       const res = await deliveriesApi.sessionState({ date });
-      return res as DeliverySessionState;
+      return (res as unknown as { data: DeliverySessionState }).data ?? (res as DeliverySessionState);
     },
     enabled: !!date,
     staleTime: 60_000,
@@ -59,8 +59,27 @@ export default function DeliveriesPage() {
 
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
-      // Hide evening deliveries when the evening session is locked (before 5 PM IST today)
+      // 1. Before 5:00 PM: Hide evening deliveries (evening is locked)
       if (eveningLocked && e.deliverySlot === 'evening') return false;
+
+      // 2. After 5:00 PM: If morning deliveries for this customer were already confirmed (delivered/skipped),
+      // only show evening deliveries (unless the user has explicitly selected the 'morning' slot filter or confirmed status filter).
+      if (!eveningLocked && slot === 'all' && isToday) {
+        const customerMorningEntries = entries.filter(
+          (other) => (other.userId || other.customerName) === (e.userId || e.customerName) && other.deliverySlot === 'morning'
+        );
+        const morningAllConfirmed =
+          customerMorningEntries.length > 0 &&
+          customerMorningEntries.every(
+            (m) => (m.deliveryStatus ?? '').toLowerCase() === 'delivered' || (m.deliveryStatus ?? '').toLowerCase() === 'skipped'
+          );
+
+        // If morning is already confirmed and completed, do not show morning delivery in the pending list
+        if (morningAllConfirmed && e.deliverySlot === 'morning' && !statusFilter) {
+          return false;
+        }
+      }
+
       if (statusFilter && e.deliveryStatus !== statusFilter) return false;
       if (slot !== 'all' && e.deliverySlot !== slot) return false;
       if (debouncedSearch) {
@@ -73,7 +92,7 @@ export default function DeliveriesPage() {
       }
       return true;
     });
-  }, [entries, statusFilter, slot, debouncedSearch, eveningLocked]);
+  }, [entries, statusFilter, slot, debouncedSearch, eveningLocked, isToday]);
 
   const groups = useMemo<{ key: string; customerName: string; phone: string | null; address: string | null; entries: DeliveryBoardEntry[] }[]>(() => {
     const map = new Map<string, { key: string; customerName: string; phone: string | null; address: string | null; entries: DeliveryBoardEntry[] }>();
@@ -101,7 +120,7 @@ export default function DeliveriesPage() {
     sp.set('date', newDate);
     sp.delete('slot');
     setSearchParams(sp, { replace: true });
-    setDrawerEntry(null);
+    setDrawerEntries(null);
   };
 
   const handlePrevDate = () => {
@@ -143,7 +162,7 @@ export default function DeliveriesPage() {
   };
 
   const openCard = (entry: DeliveryBoardEntry) => {
-    setDrawerEntry(entry);
+    setDrawerEntries([entry]);
   };
 
   if (boardQuery.isLoading || sessionQuery.isLoading) {
@@ -258,7 +277,12 @@ export default function DeliveriesPage() {
       ) : (
         <div className="flex flex-col gap-1.5">
           {groups.map((g) => (
-            <DeliveryCard key={g.key} group={g} onCardPress={(e) => setDrawerEntry(e)} eveningLocked={eveningLocked} />
+            <DeliveryCard
+              key={g.key}
+              group={g}
+              onCardPress={(_entry, customerEntries) => setDrawerEntries(customerEntries)}
+              eveningLocked={eveningLocked}
+            />
           ))}
         </div>
       )}
@@ -276,10 +300,10 @@ export default function DeliveriesPage() {
       />
 
       {/* ── Delivery details drawer (bottom sheet on mobile) ─────── */}
-      <Sheet open={drawerEntry !== null} onOpenChange={(open) => { if (!open) setDrawerEntry(null); }}>
+      <Sheet open={drawerEntries !== null} onOpenChange={(open) => { if (!open) setDrawerEntries(null); }}>
         <SheetContent side="bottom">
-          {drawerEntry && (
-            <DeliveryDetailsDrawer entry={drawerEntry} date={date} onClose={() => setDrawerEntry(null)} />
+          {drawerEntries && drawerEntries.length > 0 && (
+            <DeliveryDetailsDrawer entries={drawerEntries} date={date} onClose={() => setDrawerEntries(null)} />
           )}
         </SheetContent>
       </Sheet>

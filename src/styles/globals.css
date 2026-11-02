@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./variables.css";
+@import "./pages/milk-collections-base.css";
+@import "./pages/milk-collections.css";
 
 @theme {
   /* Brand Colors */

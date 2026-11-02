@@ -13,7 +13,7 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 # Worker-to-Worker binding: no public API hostname or CORS is required.
-# The referenced service (farmilky-api) must be deployed to the same account.
+# The referenced service (farmilky-engine) must be deployed to the same account.
 [[services]]
 binding = "BACKEND"
 service = "farmilky-engine"
