@@ -36,6 +36,7 @@ export interface NavItem {
 }
 
 export const NAV_GROUPS: { key: NonNullable<NavItem['group']>; label: string }[] = [
+  { key: 'core', label: 'Core' },
   { key: 'people', label: 'People' },
   { key: 'finance', label: 'Finance' },
   { key: 'operations', label: 'Operations' },
@@ -44,7 +45,7 @@ export const NAV_GROUPS: { key: NonNullable<NavItem['group']>; label: string }[]
 ];
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', path: '/', icon: LayoutDashboard, adminOnly: true, bottomNav: true, group: 'core' },
+  { label: 'Home', path: '/', icon: LayoutDashboard, bottomNav: true, group: 'core' },
   { label: 'Deliveries', path: '/deliveries', icon: Truck, permission: 'delivery_board.view', bottomNav: true, group: 'operations' },
   { label: 'Collection', path: '/milk-collections', icon: Milk, adminOnly: true, bottomNav: true, group: 'operations' },
   { label: 'Customers', path: '/customers', icon: Users, adminOnly: true, bottomNav: true, group: 'people' },

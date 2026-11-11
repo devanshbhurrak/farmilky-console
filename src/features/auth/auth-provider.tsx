@@ -22,11 +22,35 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 const PORTAL_ROLES = new Set(['admin', 'delivery', 'delivery_partner', 'agent']);
 
+/**
+ * Stable hasPermission function that doesn't change between renders.
+ * Uses a ref to always access the latest user/permissions without
+ * causing the context value to recompute.
+ */
+function createHasPermission(
+  getUser: () => AuthUser | null,
+  getPermissions: () => PermissionKey[]
+): (key: PermissionKey | string) => boolean {
+  return (key: PermissionKey | string): boolean => {
+    const user = getUser();
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (key === '*') return true;
+    return getPermissions().includes(key as PermissionKey);
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [permissions, setPermissions] = React.useState<PermissionKey[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const queryClient = useQueryClient();
+
+  // Refs to provide stable access to latest state for hasPermission
+  const userRef = React.useRef(user);
+  userRef.current = user;
+  const permissionsRef = React.useRef(permissions);
+  permissionsRef.current = permissions;
 
   const loadSession = React.useCallback(async () => {
     try {
@@ -101,14 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
-  const hasPermission = React.useCallback(
-    (key: PermissionKey | string): boolean => {
-      if (!user) return false;
-      if (user.role === 'admin') return true;
-      if (key === '*') return true;
-      return permissions.includes(key as PermissionKey);
-    },
-    [user, permissions],
+  // Stable hasPermission - created once, uses refs to access current state
+  const hasPermission = React.useMemo(
+    () => createHasPermission(
+      () => userRef.current,
+      () => permissionsRef.current
+    ),
+    []
   );
 
   const value = React.useMemo<AuthContextValue>(
@@ -123,7 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasPermission,
       refresh: loadSession,
     }),
-    [user, permissions, isLoading, login, logout, hasPermission, loadSession],
+    // Remove hasPermission from deps since it's now stable
+    [user, permissions, isLoading, login, logout, loadSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -111,7 +111,16 @@ export default function DeliveriesPage() {
         });
       }
     }
-    return [...map.values()].sort((a, b) => a.customerName.localeCompare(b.customerName));
+    return [...map.values()].sort((a, b) => {
+      const aDelivered = a.entries.length > 0 && a.entries.every((e) => (e.deliveryStatus ?? 'pending').toLowerCase() === 'delivered');
+      const bDelivered = b.entries.length > 0 && b.entries.every((e) => (e.deliveryStatus ?? 'pending').toLowerCase() === 'delivered');
+      
+      // Delivered groups sink to the bottom
+      if (aDelivered && !bDelivered) return 1;
+      if (!aDelivered && bDelivered) return -1;
+      // Within the same category (delivered or not), sort by customer name
+      return a.customerName.localeCompare(b.customerName);
+    });
   }, [filteredEntries]);
 
   const handleDateChange = (newDate: string) => {

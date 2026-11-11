@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { BottomNav } from './bottom-nav';
@@ -8,7 +8,6 @@ import { MobileDrawer } from './mobile-drawer';
 
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const location = useLocation();
 
   return (
     <div className="min-h-dvh bg-surface-inset">
@@ -23,7 +22,7 @@ export function AppShell() {
         <TopBar />
         <MobileHeader />
         <main id="main-content" className="mx-auto flex w-full max-w-7xl flex-1 flex-col p-2 pb-24 lg:p-6 lg:pb-10 xl:p-8">
-          <div key={location.pathname} className="page-enter flex flex-1 flex-col">
+          <div className="page-wrapper flex flex-1 flex-col animate-fade-in">
             <Outlet />
           </div>
         </main>

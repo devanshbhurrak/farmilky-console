@@ -75,7 +75,7 @@
   }
 }
 
-.page-enter {
+.page-wrapper {
   animation: var(--animate-fade-in);
 }
 
@@ -109,7 +109,7 @@ input[type="number"] {
 }
 
 /* Page roots fill the content column so table pagination sticks to the bottom */
-.page-enter > div {
+.page-wrapper > div {
   flex-grow: 1;
 }
 

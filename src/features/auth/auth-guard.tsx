@@ -10,3 +10,10 @@ export function AuthGuard() {
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;
 }
+
+export function AuthGuardOptional() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <LoadingScreen message="Checking session…" />;
+  return <Outlet />;
+}
