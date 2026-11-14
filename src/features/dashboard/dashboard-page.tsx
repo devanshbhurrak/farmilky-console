@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/layout/page-header';
 import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
@@ -78,13 +78,13 @@ export default function DashboardPage() {
     shiftQuery.isRefetching ||
     boardQuery.isRefetching;
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['admin'] });
     queryClient.invalidateQueries({ queryKey: ['subscriptions', 'delivery-board'] });
     queryClient.invalidateQueries({ queryKey: ['subscriptions', 'today-supply'] });
     queryClient.invalidateQueries({ queryKey: ['milk-collections', 'today-shift'] });
     queryClient.invalidateQueries({ queryKey: ['orders'] });
-  };
+  }, [queryClient]);
 
   const refreshAction = useMemo(
     () => (

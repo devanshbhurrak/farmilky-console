@@ -2,20 +2,17 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 
 interface HeaderActionContextValue {
   headerAction: ReactNode | null;
-  setHeaderAction: (action: ReactNode | null) => void;
 }
 
-const HeaderActionContext = createContext<HeaderActionContextValue>({
-  headerAction: null,
-  setHeaderAction: () => {},
-});
+const HeaderActionContext = createContext<HeaderActionContextValue>({ headerAction: null });
+const HeaderActionSetterContext = createContext<(action: ReactNode | null) => void>(() => {});
 
 export function HeaderActionProvider({ children }: { children: ReactNode }) {
   const [headerAction, setHeaderAction] = useState<ReactNode | null>(null);
   return (
-    <HeaderActionContext.Provider value={{ headerAction, setHeaderAction }}>
-      {children}
-    </HeaderActionContext.Provider>
+    <HeaderActionSetterContext.Provider value={setHeaderAction}>
+      <HeaderActionContext.Provider value={{ headerAction }}>{children}</HeaderActionContext.Provider>
+    </HeaderActionSetterContext.Provider>
   );
 }
 
@@ -29,7 +26,7 @@ export function useHeaderAction() {
  * ownership of the button's onClick / sheet state.
  */
 export function useRegisterHeaderAction(action: ReactNode | null) {
-  const { setHeaderAction } = useHeaderAction();
+  const setHeaderAction = useContext(HeaderActionSetterContext);
   const last = useRef<ReactNode | null>(null);
   useEffect(() => {
     if (action === last.current) return;

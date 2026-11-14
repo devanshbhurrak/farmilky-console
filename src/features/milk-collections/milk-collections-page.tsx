@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
+import { normalizeList, unwrapData } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/use-media-query';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -542,14 +543,8 @@ export default function MilkCollectionsPage() {
     setLoading(true);
     try {
       const res = await api.get<unknown>('/api/milk-collections/daily', { date });
-      let colsRaw: unknown[] = [];
-      if (res && typeof res === 'object') {
-        const obj = res as Record<string, unknown>;
-        if (Array.isArray(obj.collections)) colsRaw = obj.collections;
-        else if (Array.isArray(obj.items)) colsRaw = obj.items;
-        else if (Array.isArray(obj.data)) colsRaw = obj.data;
-      }
-      const cols = colsRaw.map((r) => normalizeCollection(r as Record<string, unknown>));
+      const { items: colsRaw } = normalizeList<Record<string, unknown>>(res, ['collections']);
+      const cols = colsRaw.map((r) => normalizeCollection(r));
       setCollections(cols);
 
       // Build initial edits for pending entries, restoring saved drafts
@@ -608,10 +603,11 @@ export default function MilkCollectionsPage() {
     api
       .get<unknown>('/api/milk-collections/missing', { startDate: fromStr, endDate: toStr })
       .then((res) => {
+        const payload = unwrapData<unknown>(res);
         let list: unknown[] = [];
-        if (Array.isArray(res)) list = res;
-        else if (res && typeof res === 'object') {
-          const obj = res as Record<string, unknown>;
+        if (Array.isArray(payload)) list = payload;
+        else if (payload && typeof payload === 'object') {
+          const obj = payload as Record<string, unknown>;
           if (Array.isArray(obj.missing)) list = obj.missing;
           else if (Array.isArray(obj.items)) list = obj.items;
           else if (Array.isArray(obj.data)) list = obj.data;
@@ -637,8 +633,14 @@ export default function MilkCollectionsPage() {
   const handleFixMissing = useCallback(async (date: string) => {
     setFixingDate(date);
     try {
-      const res = await api.post<{ message?: string; created?: number }>('/api/milk-collections/generate', { date });
-      toast.success(res?.message || 'Daily collections generated');
+      const res = await api.post<unknown>('/api/milk-collections/generate', { date });
+      const result = unwrapData<{ message?: string; created?: number } | null>(res as { data?: { message?: string; created?: number } | null });
+      toast.success(
+        result?.message ??
+          (result?.created != null
+            ? `Generated ${result.created} ${result.created === 1 ? 'entry' : 'entries'}.`
+            : 'Daily collections generated'),
+      );
       setShowMissingModal(false);
       setSelectedDate(date);
       setView('daily');
@@ -695,15 +697,17 @@ export default function MilkCollectionsPage() {
 
       setConfirmingId(collection._id);
       try {
+        const fatContent = edit.fatContent !== '' ? parseFloat(edit.fatContent) : NaN;
+        const snf = edit.snf !== '' ? parseFloat(edit.snf) : NaN;
         const payload = {
           actualQty,
           ratePerLiter,
-          fatContent: edit.fatContent !== '' ? parseFloat(edit.fatContent) : null,
-          snf: edit.snf !== '' ? parseFloat(edit.snf) : null,
+          ...(Number.isFinite(fatContent) ? { fatContent } : {}),
+          ...(Number.isFinite(snf) ? { snf } : {}),
         };
         const res = await api.post<unknown>(`/api/milk-collections/${collection._id}/confirm`, payload);
-        const dataObj = res as Record<string, unknown>;
-        const returnedCol = (dataObj.collection || dataObj.data || {}) as Record<string, unknown>;
+        const returned = unwrapData<Record<string, unknown> | null>(res as { data?: Record<string, unknown> | null });
+        const returnedCol = (returned?.collection || returned || {}) as Record<string, unknown>;
         const normalized = normalizeCollection({ ...collection, ...returnedCol, status: 'confirmed' });
 
         setCollections((prev) =>
@@ -748,8 +752,8 @@ export default function MilkCollectionsPage() {
           actualQty: 0,
           ratePerLiter,
         });
-        const dataObj = res as Record<string, unknown>;
-        const returnedCol = (dataObj.collection || dataObj.data || {}) as Record<string, unknown>;
+        const returned = unwrapData<Record<string, unknown> | null>(res as { data?: Record<string, unknown> | null });
+        const returnedCol = (returned?.collection || returned || {}) as Record<string, unknown>;
         const normalized = normalizeCollection({ ...collection, ...returnedCol, status: 'confirmed' });
 
         setCollections((prev) =>
@@ -812,13 +816,11 @@ export default function MilkCollectionsPage() {
       if (historyFilters.to) params.endDate = historyFilters.to;
 
       const res = await api.get<unknown>('/api/milk-collections', params);
-      const data = res as Record<string, unknown>;
-      let rowsRaw: unknown[] = [];
-      if (Array.isArray(data.collections)) rowsRaw = data.collections;
-      else if (Array.isArray(data.items)) rowsRaw = data.items;
-      else if (Array.isArray(data.data)) rowsRaw = data.data;
+      const payload = unwrapData<Record<string, unknown> | null>(res as { data?: Record<string, unknown> | null });
+      const data = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+      const { items: rowsRaw } = normalizeList<Record<string, unknown>>(res, ['collections']);
 
-      const normalized = rowsRaw.map((r) => normalizeCollection(r as Record<string, unknown>));
+      const normalized = rowsRaw.map((r) => normalizeCollection(r));
       setHistory(normalized);
 
       // Extract aggregates/summary
@@ -915,7 +917,6 @@ export default function MilkCollectionsPage() {
 
   return (
     <div className="view-stack milk-collections-page">
-      <PageHeader title="Milk Collections" subtitle="Daily inbound collection confirmation from farmers" />
 
       {/* ── Missing entries alert ─────────────────────────────────────── */}
       {missing.length > 0 && (
