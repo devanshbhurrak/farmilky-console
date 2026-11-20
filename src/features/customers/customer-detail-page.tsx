@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
@@ -18,10 +18,12 @@ import {
   Plus,
   Settings,
   ShoppingCart,
+  Trash2,
   Truck,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/feedback/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,7 +40,7 @@ import { FormField } from '@/components/form/form-field';
 import { api } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { cn, formatCurrency, getErrorMessage, getId, getName, normalizeList, shortId, titleCase } from '@/lib/utils';
-import { useCustomer, useUpdateCustomer } from './hooks';
+import { useCustomer, useDeleteCustomer, useUpdateCustomer } from './hooks';
 import { customersApi } from './api';
 import { CustomerForm } from './components/customer-form';
 import type { AreaOption } from './components/customer-form';
@@ -261,10 +263,13 @@ function MetaItem({
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { data: customer, isLoading } = useCustomer(id);
   const updateMutation = useUpdateCustomer();
+  const deleteMutation = useDeleteCustomer();
 
   const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [subscribeOpen, setSubscribeOpen] = React.useState(false);
   const [orderOpen, setOrderOpen] = React.useState(false);
   const [collectOpen, setCollectOpen] = React.useState(false);
@@ -290,7 +295,6 @@ export default function CustomerDetailPage() {
       id,
       data: {
         ...values,
-        email: values.email || undefined,
         password: values.password || undefined,
       },
     });
@@ -345,8 +349,15 @@ export default function CustomerDetailPage() {
               <h2 className="text-lg font-bold text-slate-900 sm:text-xl">{customer.name}</h2>
               <StatusBadge status={customer.isActive ? 'active' : 'inactive'} />
               {/* Dues — hidden on mobile so the compact card stays uncluttered */}
-              <Badge variant={balance > 0 ? 'warning' : 'success'} className="hidden sm:inline-flex">
-                {balance > 0 ? `Due ${formatCurrency(balance)}` : 'No dues'}
+              <Badge
+                variant={balance > 0 ? 'warning' : balance < 0 ? 'info' : 'success'}
+                className="hidden sm:inline-flex"
+              >
+                {balance > 0
+                  ? `Due ${formatCurrency(balance)}`
+                  : balance < 0
+                    ? `Advance ${formatCurrency(Math.abs(balance))}`
+                    : 'No dues'}
               </Badge>
             </div>
             {/* Same row, opposite corners — email left (truncates), phone pinned right */}
@@ -388,6 +399,9 @@ export default function CustomerDetailPage() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setAdjustOpen(true)}>
                   <Pencil className="size-4" /> Adjust balance
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
+                  <Trash2 className="size-4" /> Delete
                 </DropdownMenuItem>
               </DropdownMenu>
             </div>
@@ -480,7 +494,7 @@ export default function CustomerDetailPage() {
           <CustomerPaymentsTab userId={getId(customer)} month={month} year={year} />
         </TabsContent>
         <TabsContent value="orders">
-          <CustomerOrdersTab userId={getId(customer)} />
+          <CustomerOrdersTab key={getId(customer)} userId={getId(customer)} />
         </TabsContent>
         <TabsContent value="subscriptions">
           <CustomerSubscriptionsTab userId={getId(customer)} />
@@ -534,6 +548,25 @@ export default function CustomerDetailPage() {
       <QuickOrderDialog userId={getId(customer)} open={orderOpen} onOpenChange={setOrderOpen} />
       <CollectPaymentDialog userId={getId(customer)} open={collectOpen} onOpenChange={setCollectOpen} />
       <AdjustBalanceDialog userId={getId(customer)} open={adjustOpen} onOpenChange={setAdjustOpen} />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete customer?"
+        description="The customer will be deactivated and hidden from lists. This requires a zero balance and no active subscriptions."
+        confirmLabel="Delete customer"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          const customerId = getId(customer);
+          if (!customerId) return;
+          deleteMutation.mutate(customerId, {
+            onSuccess: () => {
+              setDeleteOpen(false);
+              navigate('/customers');
+            },
+          });
+        }}
+      />
     </div>
   );
 }

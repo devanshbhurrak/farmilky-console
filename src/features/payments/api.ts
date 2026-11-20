@@ -116,6 +116,11 @@ export const paymentsApi = {
     api.post<{ success: boolean; data: SupplierPayment }>('/api/supplier-payments', {
       supplierId: data.supplierId,
       amount: data.amount,
+      // The payment is effective at the end of the selected period and only
+      // settles collections inside that period.
+      date: data.toDate || undefined,
+      fromDate: data.fromDate || undefined,
+      toDate: data.toDate || undefined,
       paymentMethod: data.paymentMethod,
       paymentRef: data.transactionRef || undefined,
       notes: data.notes || undefined,

@@ -13,7 +13,7 @@ import type { DeliverySlot } from '@/types/subscription';
 import { useCancelScheduleChange, useScheduleChange } from '../hooks';
 import { slotConfigOf } from '../api';
 import type { SubscriptionDetail } from '../api';
-import { CalendarClock, AlertCircle, Trash2, CheckCircle2 } from 'lucide-react';
+import { CalendarClock, AlertCircle, Trash2 } from 'lucide-react';
 
 export function ScheduleConfig({
   subscription,

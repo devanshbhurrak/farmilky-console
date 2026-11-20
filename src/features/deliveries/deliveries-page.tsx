@@ -112,13 +112,54 @@ export default function DeliveriesPage() {
       }
     }
     return [...map.values()].sort((a, b) => {
-      const aDelivered = a.entries.length > 0 && a.entries.every((e) => (e.deliveryStatus ?? 'pending').toLowerCase() === 'delivered');
-      const bDelivered = b.entries.length > 0 && b.entries.every((e) => (e.deliveryStatus ?? 'pending').toLowerCase() === 'delivered');
-      
-      // Delivered groups sink to the bottom
-      if (aDelivered && !bDelivered) return 1;
-      if (!aDelivered && bDelivered) return -1;
-      // Within the same category (delivered or not), sort by customer name
+      // Calculate group completion rank:
+      // 0 = Pending (no items handled yet)
+      // 1 = Partially Delivered (some delivered/partial, some still pending)
+      // 2 = Fully Delivered (all items delivered)
+      // 3 = Failed / Handled (all items handled with failures/skips, or fully failed)
+      const getRank = (group: { entries: DeliveryBoardEntry[] }) => {
+        const itemStates: string[] = [];
+        for (const e of group.entries) {
+          if (e.items && e.items.length > 0) {
+            for (const it of e.items) {
+              itemStates.push((it.itemStatus ?? e.deliveryStatus ?? 'pending').toLowerCase());
+            }
+          } else {
+            itemStates.push((e.deliveryStatus ?? 'pending').toLowerCase());
+          }
+        }
+        if (itemStates.length === 0) return 0;
+
+        const allDelivered = itemStates.every((s) => s === 'delivered');
+        if (allDelivered) return 2; // Delivered -> bottom tier
+
+        const allPending = itemStates.every((s) => s === 'pending');
+        if (allPending) return 0; // Pending -> top
+
+        const anyDelivered = itemStates.some((s) => s === 'delivered' || s === 'partial');
+        const anyPending = itemStates.some((s) => s === 'pending');
+
+        if (anyDelivered && anyPending) {
+          return 1; // Partially Delivered -> above fully delivered and failed
+        }
+
+        if (anyDelivered && !anyPending) {
+          // Delivered with some failed
+          return 1;
+        }
+
+        const allFailedOrHandled = itemStates.every((s) => s === 'failed' || s === 'skipped' || s === 'missed');
+        if (allFailedOrHandled) return 3; // Fully failed/handled -> bottom tier
+
+        return 1;
+      };
+
+      const rankA = getRank(a);
+      const rankB = getRank(b);
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
       return a.customerName.localeCompare(b.customerName);
     });
   }, [filteredEntries]);
@@ -193,7 +234,7 @@ export default function DeliveriesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3 sm:p-4 lg:p-6 max-w-[620px] mx-auto">
+    <div className="flex flex-col gap-3 p-2 sm:p-4 lg:p-6 w-full max-w-[620px] mx-auto box-border overflow-x-hidden">
       {/* ── Date header ──────────────────────────────────────────── */}
       <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
         <button
@@ -310,7 +351,7 @@ export default function DeliveriesPage() {
 
       {/* ── Delivery details drawer (bottom sheet on mobile) ─────── */}
       <Sheet open={drawerEntries !== null} onOpenChange={(open) => { if (!open) setDrawerEntries(null); }}>
-        <SheetContent side="bottom">
+        <SheetContent side="bottom" className="overflow-hidden">
           {drawerEntries && drawerEntries.length > 0 && (
             <DeliveryDetailsDrawer entries={drawerEntries} date={date} onClose={() => setDrawerEntries(null)} />
           )}

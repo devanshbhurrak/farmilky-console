@@ -110,7 +110,7 @@ export interface SupplierPaymentInput {
 
 export interface SupplierAdjustmentInput {
   type: 'debit' | 'credit';
-  category?: 'advance' | 'transport' | 'quality_bonus' | 'quality_penalty' | 'rounding' | 'other';
+  category?: 'advance' | 'transport' | 'quality_bonus' | 'quality_penalty' | 'rounding' | 'payment_difference' | 'other';
   amount: number;
   date?: string;
   description?: string;
@@ -223,6 +223,9 @@ export const suppliersApi = {
       paymentMethod: data.paymentMethod,
       paymentRef: data.transactionRef || undefined,
       notes: data.notes || undefined,
+      fromDate: data.fromDate,
+      toDate: data.toDate,
+      description: data.notes || 'Supplier payment',
     });
     return unwrapData<unknown>(res);
   },

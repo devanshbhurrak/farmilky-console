@@ -32,7 +32,22 @@ export interface RecordBalanceAdjustmentInput {
   notes?: string;
 }
 
+export interface BalanceSummaryData {
+  totalCustomers: number;
+  debtorCount: number;
+  creditorCount: number;
+  settledCount: number;
+  totalDebt: number;
+  totalAdvances: number;
+  netBalance: number;
+}
+
 export const balancesApi = {
+  summary: (params?: { search?: string }) =>
+    api.get<{ success: boolean; data: BalanceSummaryData }>('/api/users/admin/balance-summary', {
+      search: params?.search,
+    }),
+
   list: (params?: BalanceListParams) =>
     api.get<PaginatedResponse<BalanceSummary>>(
       '/api/users/admin/all',

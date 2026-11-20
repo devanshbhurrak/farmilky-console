@@ -1,9 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/query-keys';
-import { getErrorMessage, normalizeList } from '@/lib/utils';
+import { getErrorMessage, normalizeList, unwrapData } from '@/lib/utils';
 import type { BalanceSummary } from '@/types/transaction';
-import { balancesApi, type BalanceListParams, type RecordBalanceAdjustmentInput, type RecordBalancePaymentInput } from './api';
+import {
+  balancesApi,
+  type BalanceListParams,
+  type BalanceSummaryData,
+  type RecordBalanceAdjustmentInput,
+  type RecordBalancePaymentInput,
+} from './api';
 
 export function useBalances(params: BalanceListParams) {
   return useQuery({
@@ -12,6 +18,17 @@ export function useBalances(params: BalanceListParams) {
       const res = await balancesApi.list(params);
       return normalizeList<BalanceSummary>(res, ['balances']);
     },
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+}
+
+/** Tenant-wide debt/advance totals, independent of the current page. */
+export function useBalanceSummary(search?: string) {
+  return useQuery({
+    queryKey: queryKeys.balances.summary({ search: search ?? '' }),
+    queryFn: async (): Promise<BalanceSummaryData> =>
+      unwrapData<BalanceSummaryData>(await balancesApi.summary({ search })),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });

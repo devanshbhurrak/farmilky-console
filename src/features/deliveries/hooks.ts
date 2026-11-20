@@ -6,9 +6,9 @@ import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage } from '@/lib/utils';
 import type { DeliveryBoardEntry } from '@/types/delivery';
 import { deliveriesApi } from './api';
-import type { DeliveryBoardParams } from './api';
+import type { DeliveryBoardParams, RecordDeliveryOutcomeRequest } from './api';
 import type { DeliveryOutcomeInput, ExtraProductsInput } from './schemas';
-import type { DeliveryItemOutcome, DeliverySessionState, UnconfirmedDelivery } from '@/types/delivery';
+import type { DeliverySessionState, UnconfirmedDelivery } from '@/types/delivery';
 
 export interface DeliveryBoardData {
   entries: DeliveryBoardEntry[];
@@ -67,7 +67,7 @@ export function useRecordDeliveryOutcome() {
       >;
       data: DeliveryOutcomeInput & {
         pricePerPacket?: number;
-        items?: DeliveryItemOutcome[];
+        items?: RecordDeliveryOutcomeRequest['items'];
         idempotencyKey?: string | null;
         expectedVersion?: number | null;
         paymentReceived?: {
@@ -78,39 +78,37 @@ export function useRecordDeliveryOutcome() {
       };
     }) => {
       const { deliveryDate, slot, paymentReceived, ...rest } = data;
+      const isInstant = entry.type === 'instant';
       return deliveriesApi.recordDeliveryOutcome({
         customerId: entry.userId,
         type: entry.type as 'subscription' | 'order' | 'instant',
-        referenceType: entry.type as 'subscription' | 'order',
-        referenceId: (() => {
-          const ref = entry.subscriptionId ?? entry.orderId;
-          if (!ref) throw new Error('Missing subscriptionId or orderId for delivery outcome');
-          return ref;
-        })(),
+        referenceType: isInstant ? undefined : (entry.type as 'subscription' | 'order'),
+        referenceId: isInstant
+          ? undefined
+          : (() => {
+              const ref = entry.subscriptionId ?? entry.orderId;
+              if (!ref) throw new Error('Missing subscriptionId or orderId for delivery outcome');
+              return ref;
+            })(),
         deliveryDate: deliveryDate ?? new Date().toISOString().slice(0, 10),
         deliverySlot: (slot ?? entry.deliverySlot) as 'morning' | 'evening' | null | undefined,
         paymentReceived: paymentReceived ?? null,
         ...rest,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.deliveries.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.manifests.all() });
+      if (variables.entry.type === 'instant') {
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.all() });
+      }
       toast.success('Outcome recorded');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 }
-
-type RecordDeliveryOutcomeRequestStatus =
-  | 'pending'
-  | 'delivered'
-  | 'partial'
-  | 'extra'
-  | 'failed'
-  | 'skipped'
-  | 'missed';
 
 // Legacy wrapper kept for any callers still referencing the per-module split.
 // Delegates to the canonical unified endpoint so there is a single charge path.
@@ -204,6 +202,15 @@ export function useInstantDelivery() {
     mutationFn: (data: ExtraProductsInput) => deliveriesApi.instantDelivery(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions', 'delivery-board'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.deliveries.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all() });
+      queryClient.invalidateQueries({ queryKey: ['balances'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
       toast.success('Extra products delivered');
     },
     onError: (err) => toast.error(getErrorMessage(err)),

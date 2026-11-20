@@ -50,9 +50,9 @@ function toCustomer(raw: unknown): Customer {
             assignedArea:
               (userObj.assignedAreaId as string | null | undefined) ?? undefined,
             deliverySequence:
-              userObj.deliverySequence !== undefined
-                ? Number(userObj.deliverySequence)
-                : undefined,
+              userObj.deliverySequence === null || userObj.deliverySequence === undefined
+                ? undefined
+                : Number(userObj.deliverySequence),
           }
         : null),
     createdAt: String(userObj.createdAt ?? new Date().toISOString()),
@@ -64,7 +64,7 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
-function toLedgerEntry(raw: unknown, index: number): LedgerEntry {
+export function toLedgerEntry(raw: unknown, index: number): LedgerEntry {
   const o = (raw ?? {}) as RawRecord;
   const amount = Number(o.amount ?? 0);
   const rawType = o.entryType ?? o.type;
@@ -76,16 +76,20 @@ function toLedgerEntry(raw: unknown, index: number): LedgerEntry {
       : amount < 0
         ? 'credit'
         : 'debit';
+  const txnType = stringOrNull(o.txnType);
   return {
     id: getId(raw) || `ledger-${index}`,
     date: String(o.effectiveDate ?? o.date ?? o.receivedDate ?? o.createdAt ?? new Date().toISOString()),
     description: String(o.description ?? o.notes ?? o.category ?? o.txnCategory ?? 'Entry'),
-    category: stringOrNull(o.category) ?? stringOrNull(o.txnCategory) ?? stringOrNull(o.txnType) ?? undefined,
+    category: stringOrNull(o.category) ?? stringOrNull(o.txnCategory) ?? txnType ?? undefined,
     type,
     amount: Math.abs(Number.isNaN(amount) ? 0 : amount),
     transactionId: stringOrNull(o.paymentRef) ?? stringOrNull(o.transactionId) ?? stringOrNull(o.txnNumber),
     notes: stringOrNull(o.notes),
     recordedBy: o.recordedBy !== undefined ? String(o.recordedBy) : null,
+    // Only `payment` entries are editable through the payments API; delivery
+    // and adjustment rows must be changed through their own modules.
+    isEditable: txnType === 'payment' && o.status !== 'voided' && o.status !== 'deleted',
     referenceId: o.referenceId !== undefined ? String(o.referenceId) : null,
     paymentType: stringOrNull(o.paymentMethod) ?? stringOrNull(o.paymentType),
   };
@@ -155,18 +159,35 @@ interface CustomerFormData {
 
 function toCustomerPayload(data: unknown, mode: 'create' | 'update'): RawRecord {
   const o = (data ?? {}) as CustomerFormData;
-  const payload: RawRecord = {
-    name: o.name,
-    phone: o.phone,
-    email: o.email || undefined,
-    role: o.role,
-  };
+  const isUpdate = mode === 'update';
+  const payload: RawRecord = {};
+
+  if (o.name !== undefined) payload.name = o.name;
+  if (o.phone !== undefined) payload.phone = o.phone;
+  if (o.role !== undefined) payload.role = o.role;
   if (o.password) payload.password = o.password;
-  if (mode === 'update') payload.isActive = o.isActive;
-  const area = o.deliveryConfig?.assignedArea;
-  if (area) payload.assignedAreaId = area;
-  const seq = o.deliveryConfig?.deliverySequence;
-  if (seq !== undefined && !Number.isNaN(seq)) payload.deliverySequence = seq;
+  if ('isActive' in o && o.isActive !== undefined) payload.isActive = o.isActive;
+
+  if ('email' in o) {
+    const email = typeof o.email === 'string' ? o.email.trim() : '';
+    // Updates must send null to clear an existing email; creates omit it.
+    payload.email = email || (isUpdate ? null : undefined);
+  }
+
+  if (o.deliveryConfig !== undefined) {
+    const area = o.deliveryConfig.assignedArea?.trim() || '';
+    const seq = o.deliveryConfig.deliverySequence;
+    const validSeq = typeof seq === 'number' && Number.isFinite(seq) ? seq : undefined;
+    if (isUpdate) {
+      // Explicit null clears the stored value.
+      payload.assignedAreaId = area || null;
+      payload.deliverySequence = validSeq ?? null;
+    } else {
+      if (area) payload.assignedAreaId = area;
+      if (validSeq !== undefined) payload.deliverySequence = validSeq;
+    }
+  }
+
   if (o.address) {
     const { street, city, pincode } = o.address;
     payload.address = { street, city, pincode };
@@ -216,6 +237,14 @@ export const customersApi = {
   async update(id: string, data: unknown): Promise<Customer> {
     const res = await api.put<unknown>(`/api/users/admin/${id}`, toCustomerPayload(data, 'update'));
     return toCustomer(unwrapData<unknown>(res));
+  },
+
+  async remove(id: string): Promise<{ deleted: boolean; id: string }> {
+    const res = await api.delete<{
+      success?: boolean;
+      data?: { deleted: boolean; id: string };
+    }>(`/api/users/admin/${id}`);
+    return unwrapData<{ deleted: boolean; id: string }>(res);
   },
 
   async updateDeliveryConfig(id: string, data: unknown): Promise<Customer> {
@@ -283,18 +312,43 @@ export const customersApi = {
     return unwrapData<unknown>(res);
   },
 
-  async customerOrders(userId: string): Promise<Order[]> {
-    const res = await api.get<unknown>('/api/orders/admin/all', { customerId: userId, limit: 50 });
-    const { items } = normalizeList<unknown>(res, ['orders']);
-    return items.map((o) => {
-      const r = o as RawRecord;
-      return { ...(o as object), id: getId(o) || String(r.id ?? '') } as Order;
+  async customerOrders(
+    userId: string,
+    params: { page?: number; limit?: number } = {},
+  ): Promise<{
+    items: Order[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const res = await api.get<unknown>('/api/orders/admin/all', {
+      customerId: userId,
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
     });
+    const { items, meta } = normalizeList<unknown>(res, ['orders']);
+    return {
+      items: items.map((o) => {
+        const r = o as RawRecord;
+        return { ...(o as object), id: getId(o) || String(r.id ?? '') } as Order;
+      }),
+      meta,
+    };
   },
 
   async areasLite(): Promise<Area[]> {
-    const res = await api.get<unknown>('/api/areas');
-    return normalizeList<Area>(res, ['areas']).items;
+    const first = normalizeList<Area>(
+      await api.get<unknown>('/api/areas', { page: 1, limit: 100 }),
+      ['areas'],
+    );
+    const items = [...first.items];
+    for (let page = 2; page <= first.meta.totalPages; page += 1) {
+      const next = normalizeList<Area>(
+        await api.get<unknown>('/api/areas', { page, limit: 100 }),
+        ['areas'],
+      );
+      if (next.items.length === 0) break;
+      items.push(...next.items);
+    }
+    return items;
   },
 
   async productsLite(): Promise<Product[]> {

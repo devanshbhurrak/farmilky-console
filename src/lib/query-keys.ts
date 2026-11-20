@@ -111,5 +111,6 @@ export const queryKeys = {
   },
   balances: {
     list: (filters: unknown) => ['balances', 'list', filters] as const,
+    summary: (filters: unknown) => ['balances', 'summary', filters] as const,
   },
 } as const;

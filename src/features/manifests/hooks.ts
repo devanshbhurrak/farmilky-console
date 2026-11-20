@@ -11,27 +11,8 @@ export function useManifests(params: ManifestListParams) {
     queryKey: queryKeys.manifests.list({ ...params }),
     queryFn: async () => {
       const res = await manifestsApi.list(params);
-      const { items } = normalizeList<unknown>(res);
-      let mapped = items.map(toManifest);
-      if (params.agentId) {
-        mapped = mapped.filter((m) => {
-          const id = typeof m.agentId === 'string' ? m.agentId : m.agentId?.id;
-          return id === params.agentId;
-        });
-      }
-      if (params.status) mapped = mapped.filter((m) => m.status === params.status);
-      const page = params.page ?? 1;
-      const limit = params.limit ?? 20;
-      const start = (page - 1) * limit;
-      return {
-        items: mapped.slice(start, start + limit),
-        meta: {
-          total: mapped.length,
-          page,
-          limit,
-          totalPages: Math.max(1, Math.ceil(mapped.length / limit)),
-        },
-      };
+      const { items, meta } = normalizeList<unknown>(res);
+      return { items: items.map(toManifest), meta };
     },
     placeholderData: keepPreviousData,
   });

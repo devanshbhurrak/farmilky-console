@@ -112,6 +112,7 @@ export default function SuppliersPage() {
     page,
     limit: 20,
     search: debouncedSearch || undefined,
+    status: status !== 'all' ? status : undefined,
   });
   const createMutation = useCreateSupplier();
 
@@ -129,12 +130,10 @@ export default function SuppliersPage() {
 
   const filtered = React.useMemo(() => {
     let items = [...(data?.items ?? [])];
-    if (status === 'active') items = items.filter((s) => s.isActive);
-    if (status === 'inactive') items = items.filter((s) => !s.isActive);
     if (balanceFilter === 'due') items = items.filter((s) => outstanding(s) > 0);
     if (balanceFilter === 'clear') items = items.filter((s) => outstanding(s) <= 0);
     return items;
-  }, [data, status, balanceFilter]);
+  }, [data, balanceFilter]);
 
   const pageStats = React.useMemo(() => ({
     count: filtered.length,
@@ -224,7 +223,6 @@ export default function SuppliersPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title="Suppliers" />
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="grid grid-cols-4 items-center divide-x divide-slate-100 px-2 py-2 sm:px-3.5">

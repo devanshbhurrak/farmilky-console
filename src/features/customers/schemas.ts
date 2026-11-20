@@ -4,6 +4,22 @@ const emailOrEmpty = z.union([z.email(), z.literal('')]).optional();
 
 const pincodeOrEmpty = z.union([z.string().regex(/^[0-9]{6}$/, 'Enter a 6-digit pincode'), z.literal('')]).optional();
 
+// React Hook Form uses `valueAsNumber`, so clearing a number input yields NaN.
+// Treat blank/NaN/null as "not provided" instead of failing validation.
+const optionalDeliverySequence = z.preprocess(
+  (value) =>
+    value === '' ||
+    value === null ||
+    (typeof value === 'number' && Number.isNaN(value))
+      ? undefined
+      : value,
+  z.coerce
+    .number()
+    .int('Enter a whole number')
+    .min(0, 'Delivery sequence cannot be negative')
+    .optional(),
+);
+
 export const USER_ROLES = [
   'customer',
   'admin',
@@ -36,7 +52,7 @@ export const customerSchema = z.object({
   deliveryConfig: z
     .object({
       assignedArea: z.string().optional(),
-      deliverySequence: z.coerce.number().min(0).optional(),
+      deliverySequence: optionalDeliverySequence,
     })
     .optional(),
 });

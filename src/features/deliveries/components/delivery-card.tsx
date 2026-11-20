@@ -19,22 +19,33 @@ export function DeliveryCard({
 }) {
   const { customerName, phone, address, entries } = group;
   const firstEntry = entries[0];
-  const statuses = entries.map((e) => (e.deliveryStatus ?? 'pending').toLowerCase());
-  const allDelivered = statuses.every((s) => s === 'delivered');
-  const anyFailed = statuses.some((s) => s === 'failed');
-  const anyPartial = statuses.some((s) => s === 'partial');
-  const anySkipped = statuses.some((s) => s === 'skipped');
-  const allPending = statuses.every((s) => s === 'pending');
+  // Inspect granular item statuses across all entries in this group
+  const itemStatuses: string[] = [];
+  for (const e of entries) {
+    if (e.items && e.items.length > 0) {
+      for (const it of e.items) {
+        itemStatuses.push((it.itemStatus ?? e.deliveryStatus ?? 'pending').toLowerCase());
+      }
+    } else {
+      itemStatuses.push((e.deliveryStatus ?? 'pending').toLowerCase());
+    }
+  }
+
+  const allDelivered = itemStatuses.length > 0 && itemStatuses.every((s) => s === 'delivered');
+  const allFailed = itemStatuses.length > 0 && itemStatuses.every((s) => s === 'failed' || s === 'skipped' || s === 'missed');
+  const allPending = itemStatuses.length > 0 && itemStatuses.every((s) => s === 'pending');
+  const anyDelivered = itemStatuses.some((s) => s === 'delivered' || s === 'partial');
+  const anyFailed = itemStatuses.some((s) => s === 'failed' || s === 'skipped');
 
   const overallStatus: string = allDelivered
     ? 'delivered'
-    : anyFailed
+    : allFailed
       ? 'failed'
-      : anyPartial
-        ? 'partial'
-        : anySkipped
-          ? 'skipped'
-          : allPending ? 'pending' : 'partial';
+      : allPending
+        ? 'pending'
+        : (anyDelivered || anyFailed || itemStatuses.some((s) => s === 'partial'))
+          ? 'partial'
+          : 'pending';
 
   const sessions = [...new Set(entries.map((e) => e.deliverySlot).filter(Boolean))] as string[];
   const totalScheduled = entries.reduce((sum, e) => sum + Number(e.scheduledQuantity ?? e.quantity ?? 0), 0);
@@ -53,6 +64,7 @@ export function DeliveryCard({
     productName: e.productName ?? 'Delivery',
     quantity: Number(e.scheduledQuantity ?? e.quantity ?? 0),
     deliveredQuantity: Number(e.actualQuantity ?? 0),
+    unitPrice: e.pricePerPacket ?? undefined,
     unit: e.unit ?? null,
     itemStatus: e.deliveryStatus,
     deliverySlot: e.deliverySlot ?? 'morning',
@@ -119,6 +131,16 @@ export function DeliveryCard({
             Delivered
           </Badge>
         )}
+        {overallStatus === 'partial' && (
+          <Badge variant="outline" className="px-2 py-0.5 text-amber-700 bg-amber-50 border-amber-200 shrink-0">
+            Partially Delivered
+          </Badge>
+        )}
+        {overallStatus === 'failed' && (
+          <Badge variant="outline" className="px-2 py-0.5 text-rose-700 bg-rose-50 border-rose-200 shrink-0">
+            Failed
+          </Badge>
+        )}
         <span className="ml-auto shrink-0 whitespace-nowrap">
           {totalActual > 0 ? (
             <>
@@ -137,23 +159,66 @@ export function DeliveryCard({
       </div>
 
       {displayItems.length > 0 && (
-        <div className="mt-1.5 flex flex-col gap-0.5">
+        <div className="mt-2 flex flex-col gap-1.5">
           {displayItems.map((item, idx) => (
-            <div key={`${item.productId}-${idx}`} className="flex min-w-0 items-center justify-between gap-1 px-1 py-0.5 rounded bg-slate-50">
+            <div
+              key={`${item.productId}-${idx}`}
+              className={cn(
+                "flex min-w-0 items-center justify-between gap-2 px-2 py-1.5 rounded-md border transition-colors",
+                item.itemStatus === "delivered"
+                  ? "bg-emerald-50/60 border-emerald-100"
+                  : item.itemStatus === "failed"
+                    ? "bg-rose-50/60 border-rose-100"
+                    : item.itemStatus === "partial"
+                      ? "bg-amber-50/60 border-amber-100"
+                      : "bg-slate-50 border-slate-100"
+              )}
+            >
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className="min-w-0 truncate text-xs text-slate-600">{item.productName}</span>
+                <span className="min-w-0 truncate text-xs text-slate-800 font-semibold">{item.productName}</span>
                 {item.deliverySlot && (
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] px-1 py-0 uppercase shrink-0 font-medium",
-                    item.deliverySlot === 'morning' ? 'border-amber-200 text-amber-700 bg-amber-50/50' : 'border-indigo-200 text-indigo-700 bg-indigo-50/50'
-                  )}>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[8px] px-1 py-0 uppercase shrink-0 font-medium",
+                      item.deliverySlot === 'morning'
+                        ? 'border-amber-200 text-amber-700 bg-amber-50'
+                        : 'border-indigo-200 text-indigo-700 bg-indigo-50'
+                    )}
+                  >
                     {SESSION_LABEL[item.deliverySlot] || item.deliverySlot}
                   </Badge>
                 )}
+                {item.itemStatus && (
+                  <span
+                    className={cn(
+                      "text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0",
+                      item.itemStatus === "delivered"
+                        ? "text-emerald-700 bg-emerald-100/70"
+                        : item.itemStatus === "failed"
+                          ? "text-rose-700 bg-rose-100/70"
+                          : item.itemStatus === "partial"
+                            ? "text-amber-800 bg-amber-100/70"
+                            : "text-slate-600 bg-slate-200/70"
+                    )}
+                  >
+                    {item.itemStatus}
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] font-mono tabular-nums text-slate-800 shrink-0 whitespace-nowrap">
-                {formatNumber(item.deliveredQuantity)} / {formatNumber(item.quantity)}{item.unit && ` ${item.unit}`}
-              </span>
+
+              <div className="flex items-baseline gap-1.5 shrink-0 text-right">
+                <span className="text-[11px] font-mono tabular-nums font-semibold text-slate-900 whitespace-nowrap">
+                  {formatNumber(item.deliveredQuantity ?? 0)}
+                  <span className="text-slate-400 font-normal"> / </span>
+                  {formatNumber(item.quantity)}{item.unit && ` ${item.unit}`}
+                </span>
+                {item.unitPrice ? (
+                  <span className="text-[10px] font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                    (₹{formatNumber((item.itemStatus === 'failed' ? 0 : (item.deliveredQuantity ?? 0)) * item.unitPrice)})
+                  </span>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

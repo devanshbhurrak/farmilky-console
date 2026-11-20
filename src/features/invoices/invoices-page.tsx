@@ -1,70 +1,156 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Receipt } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
+import { ChevronLeft, ChevronRight, Layers, Plus, Receipt } from 'lucide-react';
 import { useRegisterHeaderAction } from '@/components/layout/header-action-context';
 import { DataTable, type Column } from '@/components/data/data-table';
-import { FilterButton, FilterDrawer, useFilterDrawer } from '@/components/data/filter-drawer';
-import { FormField } from '@/components/form/form-field';
 import { SearchInput } from '@/components/data/search-input';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { useDebounce } from '@/hooks/use-debounce';
-import { formatCurrency, getErrorMessage, getId } from '@/lib/utils';
+import { cn, formatCurrency, getErrorMessage, getId } from '@/lib/utils';
 import { INVOICE_STATUSES, type Invoice } from '@/types/invoice';
 import { useInvoices } from './hooks';
 import { InvoiceCard, customerLabel, periodLabel } from './components/invoice-table';
 import { GenerateInvoiceDialog } from './components/generate-invoice-dialog';
 import { BulkGenerateDialog } from './components/bulk-generate-dialog';
 
-function currentMonthYear(): { month: number; year: number } {
+const PAGE_SIZE = 20;
+const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
+
+/* ---------- helpers ---------- */
+
+/** Reads month/year from the URL and clamps to a valid, non-future billing month. */
+function resolvePeriod(rawMonth: string | null, rawYear: string | null) {
   const now = new Date();
-  return { month: now.getMonth() + 1, year: now.getFullYear() };
+  const current = { month: now.getMonth() + 1, year: now.getFullYear() };
+  const month = Number(rawMonth);
+  const year = Number(rawYear);
+
+  const valid =
+    Number.isInteger(month) && month >= 1 && month <= 12 && Number.isInteger(year) && year >= 2000;
+  const future = year > current.year || (year === current.year && month > current.month);
+
+  if (!valid || future) return { ...current, isCurrent: true };
+  return { month, year, isCurrent: month === current.month && year === current.year };
 }
+
+function formatStatus(s: string) {
+  const text = s.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/* ---------- local components ---------- */
+
+function MonthStepper({
+  month,
+  year,
+  atCurrent,
+  onShift,
+}: {
+  month: number;
+  year: number;
+  atCurrent: boolean;
+  onShift: (delta: -1 | 1) => void;
+}) {
+  const arrow =
+    'grid size-9 place-items-center rounded-md text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-30';
+
+  return (
+    <div className="flex h-11 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-1">
+      <button type="button" className={arrow} aria-label="Previous month" onClick={() => onShift(-1)}>
+        <ChevronLeft className="size-4" />
+      </button>
+      <span
+        className="min-w-[5.5rem] text-center text-sm font-medium tabular-nums text-slate-800"
+        aria-live="polite"
+      >
+        {monthFormatter.format(new Date(year, month - 1, 1))}
+      </span>
+      <button
+        type="button"
+        className={arrow}
+        aria-label="Next month"
+        disabled={atCurrent}
+        onClick={() => onShift(1)}
+      >
+        <ChevronRight className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+function StatusChips({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const options = ['', ...INVOICE_STATUSES] as string[];
+
+  return (
+    <div
+      role="group"
+      aria-label="Filter by status"
+      className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+    >
+      {options.map((s) => {
+        const active = s === value;
+        return (
+          <button
+            key={s || 'all'}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(s)}
+            className={cn(
+              'h-8 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400',
+              active
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+            )}
+          >
+            {s ? formatStatus(s) : 'All'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- page ---------- */
 
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaults = currentMonthYear();
 
   const search = searchParams.get('search') ?? '';
   const status = searchParams.get('status') ?? '';
-  const month = Number(searchParams.get('month') ?? defaults.month);
-  const year = Number(searchParams.get('year') ?? defaults.year);
-  const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1);
+  const { month, year, isCurrent: atCurrentMonth } = resolvePeriod(
+    searchParams.get('month'),
+    searchParams.get('year'),
+  );
+  const page = Math.max(1, Math.floor(Number(searchParams.get('page'))) || 1);
   const debouncedSearch = useDebounce(search);
 
   const [generateOpen, setGenerateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  const filters = useFilterDrawer({ status });
-
-  const setParam = (key: string, value: string) => {
+  const updateParams = (changes: Record<string, string>, keepPage = false) => {
     const next = new URLSearchParams(searchParams);
-    if (!value) next.delete(key);
-    else next.set(key, value);
-    if (key !== 'page') next.delete('page');
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    if (!keepPage) next.delete('page');
     setSearchParams(next, { replace: true });
   };
 
   const shiftMonth = (delta: -1 | 1) => {
+    if (delta === 1 && atCurrentMonth) return;
     const d = new Date(year, month - 1 + delta, 1);
-    const now = new Date();
-    const max = new Date(now.getFullYear(), now.getMonth(), 1);
-    if (d > max) return;
-    const next = new URLSearchParams(searchParams);
-    next.set('month', String(d.getMonth() + 1));
-    next.set('year', String(d.getFullYear()));
-    next.delete('page');
-    setSearchParams(next, { replace: true });
+    updateParams({ month: String(d.getMonth() + 1), year: String(d.getFullYear()) });
   };
 
-  const atCurrentMonth = month === defaults.month && year === defaults.year;
+  const hasFilters = Boolean(search || status);
+  const clearFilters = () => updateParams({ search: '', status: '' });
 
   const invoicesQuery = useInvoices({
     page,
-    limit: 20,
+    limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
     status: status || undefined,
     month,
@@ -72,126 +158,90 @@ export default function InvoicesPage() {
   });
 
   const invoices = invoicesQuery.data?.items ?? [];
+  const total = invoicesQuery.data?.meta.total ?? 0;
+  const totalPages = invoicesQuery.data?.meta.totalPages ?? 0;
 
-  const columns: Column<Invoice>[] = [
-    {
-      header: 'Invoice',
-      cell: (inv) => (
-        <button
-          type="button"
-          onClick={() => navigate(`/invoices/${getId(inv)}`)}
-          className="cursor-pointer text-left font-medium text-slate-900 hover:underline"
-        >
-          {inv.invoiceNumber}
-        </button>
-      ),
-    },
-    {
-      header: 'Customer',
-      cell: (inv) => customerLabel(inv),
-    },
-    {
-      header: 'Period',
-      cell: (inv) => periodLabel(inv),
-    },
-    {
-      header: 'Net due',
-      cell: (inv) => <span className="font-semibold">{formatCurrency(inv.netAmountDue)}</span>,
-    },
-    {
-      header: 'Status',
-      cell: (inv) => <StatusBadge status={String(inv.status)} />,
-    },
-  ];
+  // Jump back to the last valid page if the current one no longer exists.
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) updateParams({ page: String(totalPages) }, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, page]);
+
+  const columns = useMemo<Column<Invoice>[]>(
+    () => [
+      {
+        header: 'Invoice',
+        cell: (inv) => (
+          <button
+            type="button"
+            onClick={() => navigate(`/invoices/${getId(inv)}`)}
+            className="cursor-pointer text-left font-medium text-slate-900 hover:underline focus-visible:underline focus-visible:outline-none"
+          >
+            {inv.invoiceNumber}
+          </button>
+        ),
+      },
+      { header: 'Customer', cell: (inv) => customerLabel(inv) },
+      { header: 'Period', cell: (inv) => periodLabel(inv) },
+      {
+        header: 'Net due',
+        cell: (inv) => (
+          <span className="font-semibold tabular-nums">{formatCurrency(inv.netAmountDue)}</span>
+        ),
+      },
+      { header: 'Status', cell: (inv) => <StatusBadge status={String(inv.status)} /> },
+    ],
+    [navigate],
+  );
 
   const headerAction = useMemo(
     () => (
       <>
-        <Button variant="outline" onClick={() => setBulkOpen(true)} className="min-h-11">
-          Bulk generate
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 gap-2"
+          aria-label="Bulk generate"
+          onClick={() => setBulkOpen(true)}
+        >
+          <Layers className="size-4" />
+          <span className="hidden sm:inline">Bulk generate</span>
         </Button>
-        <Button onClick={() => setGenerateOpen(true)} className="min-h-11">
-          Generate invoice
+        <Button
+          type="button"
+          className="min-h-11 gap-2"
+          aria-label="Generate invoice"
+          onClick={() => setGenerateOpen(true)}
+        >
+          <Plus className="size-4" />
+          <span className="hidden sm:inline">Generate invoice</span>
         </Button>
       </>
     ),
-    [setBulkOpen, setGenerateOpen],
+    [],
   );
   useRegisterHeaderAction(headerAction);
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Invoices" />
-
+    <div className="flex flex-col gap-5">
+      {/* Toolbar */}
       <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <SearchInput
             value={search}
-            onChange={(v) => setParam('search', v)}
-            placeholder="Search invoices…"
+            onChange={(v) => updateParams({ search: v })}
+            placeholder="Search by invoice or customer…"
             className="flex-1"
           />
-          <FilterButton activeCount={status ? 1 : 0} onClick={filters.openDrawer} />
+          <MonthStepper
+            month={month}
+            year={year}
+            atCurrent={atCurrentMonth}
+            onShift={shiftMonth}
+          />
         </div>
-        <div className="hidden grid-cols-1 gap-3 sm:grid-cols-2 md:grid">
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
-              <ChevronLeft />
-            </Button>
-            <span className="min-w-32 text-center text-sm font-medium text-slate-700" aria-live="polite">
-              {periodLabel({ billingPeriod: { month, year } } as Invoice)}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Next month"
-              disabled={atCurrentMonth}
-              onClick={() => shiftMonth(1)}
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-          <Select
-            value={status}
-            onChange={(e) => setParam('status', e.target.value)}
-            className="min-h-11"
-            aria-label="Status filter"
-          >
-            <option value="">All statuses</option>
-            {INVOICE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <StatusChips value={status} onChange={(v) => updateParams({ status: v })} />
       </div>
-
-      <FilterDrawer
-        open={filters.open}
-        onOpenChange={filters.setOpen}
-        activeCount={status ? 1 : 0}
-        onApply={() => {
-          setParam('status', filters.draft.status);
-          filters.setOpen(false);
-        }}
-        onReset={() => filters.setDraft({ status: '' })}
-      >
-        <FormField label="Status">
-          <Select
-            value={filters.draft.status}
-            onChange={(e) => filters.setField('status', e.target.value)}
-            aria-label="Status filter"
-          >
-            <option value="">All statuses</option>
-            {INVOICE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-      </FilterDrawer>
 
       <DataTable<Invoice>
         data={invoices}
@@ -201,17 +251,21 @@ export default function InvoicesPage() {
         error={invoicesQuery.isError ? getErrorMessage(invoicesQuery.error) : null}
         onRetry={() => invoicesQuery.refetch()}
         emptyTitle="No invoices found"
-        emptyMessage="Generate an invoice or adjust your filters."
+        emptyMessage={
+          hasFilters
+            ? 'Nothing matches your search or status filter.'
+            : 'No invoices have been generated for this month.'
+        }
         emptyIcon={<Receipt className="size-6" />}
-        emptyActionLabel="Generate invoice"
-        onEmptyAction={() => setGenerateOpen(true)}
+        emptyActionLabel={hasFilters ? 'Clear filters' : 'Generate invoice'}
+        onEmptyAction={hasFilters ? clearFilters : () => setGenerateOpen(true)}
         renderCard={(inv) => (
           <InvoiceCard invoice={inv} onClick={() => navigate(`/invoices/${getId(inv)}`)} />
         )}
         page={page}
-        totalPages={invoicesQuery.data?.meta.totalPages ?? 0}
-        total={invoicesQuery.data?.meta.total ?? 0}
-        onPageChange={(p) => setParam('page', String(p))}
+        totalPages={totalPages}
+        total={total}
+        onPageChange={(p) => updateParams({ page: String(p) }, true)}
       />
 
       <GenerateInvoiceDialog

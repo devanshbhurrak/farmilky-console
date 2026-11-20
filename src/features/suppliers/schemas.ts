@@ -8,13 +8,18 @@ const pincodeSchema = z.union([
   z.string().regex(/^[1-9][0-9]{5}$/, 'Enter a valid 6-digit pincode'),
 ]).optional();
 
+// Date string in YYYY-MM-DD format
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
+
+const dateStringOptional = dateString.optional();
+
 export const supplierSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   phone: z.string().trim().regex(/^[6-9][0-9]{9}$/, 'Enter a valid 10-digit Indian mobile number'),
   email: emailOrEmpty,
   location: z.string().optional(),
   pincode: pincodeSchema,
-  joiningDate: z.string().optional(),
+  joiningDate: dateStringOptional,
   collectionSessions: z.array(z.enum(['morning', 'evening'])).min(1, 'Select at least one collection session').default(['morning']),
   defaultMorningQty: z.coerce.number().min(0, 'Quantity cannot be negative').optional(),
   defaultEveningQty: z.coerce.number().min(0, 'Quantity cannot be negative').optional(),

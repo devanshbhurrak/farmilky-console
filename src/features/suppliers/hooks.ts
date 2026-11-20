@@ -41,6 +41,8 @@ export function useUpdateSupplier() {
       toast.success('Supplier updated');
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.id), 'collection-total'] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.id), 'passbook'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -71,6 +73,8 @@ export function useSetSupplierStatus() {
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.id), 'collection-total'] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.id), 'passbook'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -101,6 +105,7 @@ export function useRecordSupplierPayment() {
       toast.success('Supplier payment recorded');
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(variables.supplierId) });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.supplierId), 'collection-total'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -115,6 +120,8 @@ export function useRecordSupplierAdjustment() {
       toast.success('Adjustment recorded');
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers.detail(variables.supplierId) });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.supplierId), 'collection-total'] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.suppliers.detail(variables.supplierId), 'passbook'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

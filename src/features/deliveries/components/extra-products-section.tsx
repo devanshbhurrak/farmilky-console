@@ -132,8 +132,6 @@ export function ExtraProductsSection({
         <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
           <option value="COD">COD</option>
           <option value="online">Online</option>
-          <option value="upi">UPI</option>
-          <option value="subscription_ledger">Subscription ledger</option>
         </Select>
       </FormField>
       <Button onClick={submit} loading={instantDelivery.isPending} className="min-h-11">

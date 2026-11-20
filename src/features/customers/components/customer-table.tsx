@@ -55,10 +55,14 @@ export function CustomerCard({
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge
-              variant={balance > 0 ? 'warning' : 'success'}
+              variant={balance > 0 ? 'warning' : balance < 0 ? 'info' : 'success'}
               className="px-2 py-0.5 text-[11px]"
             >
-              {balance > 0 ? `Due ${formatCurrency(balance)}` : 'Clear'}
+              {balance > 0
+                ? `Due ${formatCurrency(balance)}`
+                : balance < 0
+                  ? `Advance ${formatCurrency(Math.abs(balance))}`
+                  : 'Clear'}
             </Badge>
             {area && (
               <Badge variant="outline" className="max-w-[8rem] truncate px-2 py-0.5 text-[11px]">

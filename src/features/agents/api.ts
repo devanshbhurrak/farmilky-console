@@ -149,7 +149,7 @@ export const agentsApi = {
   },
 
   async areasLite(): Promise<{ id: string; name: string }[]> {
-    const res = await api.get<unknown>('/api/areas');
+    const res = await api.get<unknown>('/api/areas', { limit: 100 });
     const { items } = normalizeList<RawRecord>(res, ['areas']);
     return items.map((a) => ({ id: getId(a) || String(a.id ?? ''), name: String(a.name ?? '') }));
   },

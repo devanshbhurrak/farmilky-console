@@ -137,7 +137,6 @@ export default function OrdersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Orders" />
 
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">

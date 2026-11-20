@@ -228,19 +228,7 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="view-stack subscriptions-page flex flex-col gap-3 p-3 sm:p-4">
-      <PageHeader
-        title="Subscriptions"
-        actions={
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => setCreateOpen(true)}
-            className="flex sm:hidden w-full min-h-[42px] justify-center text-sm font-semibold shadow-sm"
-          >
-            <Plus className="size-4 mr-1" /> Add Subscription
-          </Button>
-        }
-      />
+     
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
         {/* Search & Filter Toolbar */}

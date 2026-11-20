@@ -34,6 +34,7 @@ export interface Invoice {
   orderCredits?: number;
   totalPayments?: number;
   totalAdjustments?: number;
+  totalRefunds?: number;
   netAmountDue: number;
   status: InvoiceStatus | string;
   lineItems?: InvoiceLineItem[];

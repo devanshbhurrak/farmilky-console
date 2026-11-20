@@ -16,6 +16,7 @@ export function InvoiceLineItems({ invoice }: { invoice: Invoice }) {
     { label: 'Total charges', value: Number(invoice.totalCharges ?? 0) },
     { label: 'Order credits', value: -(Number(invoice.orderCredits ?? 0)) },
     { label: 'Total payments', value: -(Number(invoice.totalPayments ?? 0)) },
+    { label: 'Total refunds', value: -(Number(invoice.totalRefunds ?? 0)) },
     { label: 'Total adjustments', value: Number(invoice.totalAdjustments ?? 0) },
   ];
 

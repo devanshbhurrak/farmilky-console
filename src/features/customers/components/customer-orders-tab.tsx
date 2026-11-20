@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { DataTable } from '@/components/data/data-table';
 import type { Column } from '@/components/data/data-table';
@@ -19,7 +20,8 @@ function orderStatus(order: Order): string {
 }
 
 export function CustomerOrdersTab({ userId }: { userId: string }) {
-  const { data, isLoading, error, refetch } = useCustomerOrders(userId);
+  const [page, setPage] = React.useState(1);
+  const { data, isLoading, error, refetch } = useCustomerOrders(userId, page);
 
   const columns: Column<Order>[] = [
     {
@@ -54,7 +56,7 @@ export function CustomerOrdersTab({ userId }: { userId: string }) {
 
   return (
     <DataTable<Order>
-      data={data ?? []}
+      data={data?.items ?? []}
       columns={columns}
       keyExtractor={(o, i) => getId(o) || `order-${i}`}
       loading={isLoading}
@@ -62,6 +64,10 @@ export function CustomerOrdersTab({ userId }: { userId: string }) {
       onRetry={() => refetch()}
       emptyTitle="No orders yet"
       emptyMessage="Orders placed by this customer will appear here."
+      page={data?.meta.page ?? page}
+      totalPages={data?.meta.totalPages ?? 0}
+      total={data?.meta.total ?? 0}
+      onPageChange={setPage}
       renderCard={(o) => (
         <Link
           to={`/orders/${getId(o)}`}

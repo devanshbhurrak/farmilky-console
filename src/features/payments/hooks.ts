@@ -5,10 +5,10 @@ import { getErrorMessage, normalizeList, unwrapData } from '@/lib/utils';
 import type { SupplierPayment } from '@/types/payment';
 import type { Customer, LedgerEntry } from '@/types/customer';
 import type { Supplier } from '@/types/supplier';
+import { toLedgerEntry } from '@/features/customers/api';
 import {
   paymentsApi,
   type CustomerBalanceParams,
-  type PassbookParams,
   type RecordAdjustmentInput,
   type RecordPaymentInput,
   type RecordSupplierAdjustmentInput,
@@ -26,18 +26,22 @@ export interface PassbookData {
 
 function toPassbookData(response: unknown): PassbookData {
   const data = unwrapData<unknown>(response as { success?: boolean; data?: unknown });
-  let entries: LedgerEntry[] = [];
+  // Raw API rows use snake-ish DTO fields (entryType/effectiveDate), so they
+  // must go through the same mapper as the customer ledger. Using them
+  // directly made every passbook row render as a credit with no date.
+  let rawEntries: unknown[] = [];
   if (Array.isArray(data)) {
-    entries = data as LedgerEntry[];
+    rawEntries = data;
   } else if (data !== null && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     if (Array.isArray(obj.entries)) {
-      entries = obj.entries as LedgerEntry[];
+      rawEntries = obj.entries;
     } else {
-      const { items } = normalizeList<LedgerEntry>(response, ['entries', 'transactions', 'ledger']);
-      entries = items;
+      const { items } = normalizeList<unknown>(response, ['entries', 'transactions', 'ledger']);
+      rawEntries = items;
     }
   }
+  const entries: LedgerEntry[] = rawEntries.map(toLedgerEntry);
   let debits = 0;
   let credits = 0;
   for (const e of entries) {

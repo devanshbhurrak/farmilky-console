@@ -849,6 +849,7 @@ export default function SubscriptionDetailPage() {
               }}
               onSubmit={handleEdit}
               submitting={updateMutation.isPending}
+              isEdit={true}
             />
           </SheetBody>
         </SheetContent>

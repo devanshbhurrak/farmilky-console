@@ -57,7 +57,7 @@ export interface RecordDeliveryOutcomeRequest {
     quantity: number;
     unitPrice: number;
     deliveredQuantity?: number;
-    itemStatus?:
+    status?:
       | 'pending'
       | 'delivered'
       | 'partial'
@@ -113,7 +113,7 @@ export interface RecordPaymentRequest {
 
 export interface InstantDeliveryRequest {
   customerId: string;
-  items: { productId: string; quantity: number; price: number }[];
+  items: { productId: string; variantId?: string; quantity: number; price: number }[];
   paymentMode?: string;
   subscriptionId?: string;
 }
@@ -187,13 +187,18 @@ export const deliveriesApi = {
   recordOrderOutcome: (id: string, data: BoardOutcomeRequest) =>
     api.post<unknown>(`/api/orders/admin/${id}/delivery-outcome`, data, { idempotent: true }),
   instantDelivery: (data: InstantDeliveryRequest) =>
-    // Backend instantDeliverySchema expects userId + paymentMethod; items only
-    // need productId + quantity (price is resolved server-side).
+    // Backend instantDeliverySchema expects userId + paymentMethod; items carry
+    // productId, quantity and an optional custom price override.
     api.post<unknown>(
       '/api/orders/admin/instant-delivery',
       {
         userId: data.customerId,
-        items: data.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: data.items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          quantity: i.quantity,
+          price: i.price,
+        })),
         paymentMethod: data.paymentMode ?? 'COD',
       },
       { idempotent: true },

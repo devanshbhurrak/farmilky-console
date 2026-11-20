@@ -5,7 +5,6 @@ import type { RecordAdjustmentInput, RecordPaymentInput } from './api';
 import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage } from '@/lib/utils';
 import type { CustomerListParams } from '@/types/customer';
-import type { Order } from '@/types/order';
 
 export function useCustomers(params: CustomerListParams) {
   return useQuery({
@@ -48,6 +47,18 @@ export function useUpdateCustomer() {
   });
 }
 
+export function useDeleteCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => customersApi.remove(id),
+    onSuccess: () => {
+      toast.success('Customer deleted');
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all() });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
 export function useUpdateDeliveryConfig() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -69,10 +80,10 @@ export function useCustomerSubscriptions(userId: string | undefined) {
   });
 }
 
-export function useCustomerOrders(userId: string | undefined) {
-  return useQuery<Order[]>({
-    queryKey: queryKeys.orders.list({ customerId: userId ?? '' }),
-    queryFn: () => customersApi.customerOrders(userId as string),
+export function useCustomerOrders(userId: string | undefined, page = 1) {
+  return useQuery({
+    queryKey: queryKeys.orders.list({ customerId: userId ?? '', page }),
+    queryFn: () => customersApi.customerOrders(userId as string, { page, limit: 20 }),
     enabled: !!userId,
   });
 }

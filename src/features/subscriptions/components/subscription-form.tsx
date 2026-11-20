@@ -62,6 +62,7 @@ export function SubscriptionForm({
   onSubmit,
   submitting,
   fixedCustomerId,
+  isEdit = false,
 }: {
   defaultValues?: Partial<SubscriptionInput> & {
     quantityPerDay?: number;
@@ -72,6 +73,7 @@ export function SubscriptionForm({
   onSubmit: (values: SubscriptionInput) => void;
   submitting?: boolean;
   fixedCustomerId?: string;
+  isEdit?: boolean;
 }) {
   const [customerSearch, setCustomerSearch] = useState('');
   const debouncedCustomerSearch = useDebounce(customerSearch, 400);
@@ -218,14 +220,20 @@ export function SubscriptionForm({
           quantityPerDelivery: slots.length > 1 ? Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || 1 : Number(slotQtyMap[slot] ?? v.quantityPerDelivery) || v.quantityPerDelivery,
         }));
         const total = deliverySlots.reduce((sum, s) => sum + (s.quantityPerDelivery ?? 0), 0);
-        onSubmit({
+        // Only include customPrice when it's actually a custom price (differs from standard price)
+        const submitData: SubscriptionInput = {
           ...v,
           userId: fixedCustomerId ?? v.userId,
           quantityPerDelivery: total >= 0.001 ? total : v.quantityPerDelivery,
           deliverySlot: slots[0] ?? v.deliverySlot,
           slots,
           slotQuantities: slotQtyMap,
-        });
+        };
+        // Remove customPrice if it's not actually a custom price
+        if (!isCustomPrice) {
+          delete (submitData as Record<string, unknown>).customPrice;
+        }
+        onSubmit(submitData);
       })}
       id="subscription-form"
       className="form-stack flex flex-col gap-4 text-slate-800"
@@ -291,13 +299,17 @@ export function SubscriptionForm({
               <button
                 key={slot}
                 type="button"
-                onClick={() => toggleSlot(slot)}
+                onClick={isEdit ? undefined : () => toggleSlot(slot)}
+                disabled={isEdit}
                 className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold transition-all ${
-                  active
+                  isEdit
+                    ? 'opacity-50 cursor-not-allowed'
+                    : active
                     ? 'border-primary-600 bg-primary-50 text-primary-900 shadow-sm'
                     : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
                 aria-pressed={active}
+                aria-disabled={isEdit}
               >
                 {slotLabel(slot)} Slot
               </button>
@@ -306,6 +318,11 @@ export function SubscriptionForm({
         </div>
         {errors.slots?.message && (
           <p className="text-xs text-red-600">{errors.slots.message}</p>
+        )}
+        {isEdit && (
+          <p className="text-xs text-slate-500">
+            Delivery slots cannot be changed. Cancel and recreate the subscription to change slots.
+          </p>
         )}
       </div>
 

@@ -174,5 +174,9 @@ export function useLoadSheet() {
     rows,
     isLoading: supply.isLoading || catalog.isLoading,
     isError: supply.isError || catalog.isError,
+    isRefetching: supply.isRefetching || catalog.isRefetching,
+    refetch: async (options?: { throwOnError?: boolean }) => {
+      await Promise.all([supply.refetch(options), catalog.refetch(options)]);
+    },
   };
 }

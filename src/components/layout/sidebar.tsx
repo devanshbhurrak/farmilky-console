@@ -6,7 +6,7 @@ import { useAuth } from '@/features/auth/auth-provider';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
-  const { isAdmin, hasPermission } = useAuth();
+  const { isAdmin, hasPermission, user } = useAuth();
   const items = NAV_ITEMS.filter((item) => {
     if (item.adminOnly) return isAdmin;
     if (item.permission) return isAdmin || hasPermission(item.permission);
@@ -57,6 +57,13 @@ export function Sidebar() {
         })}
       </nav>
       <div className="border-t border-slate-100 p-3 text-xs text-slate-400">Farmilky Management v2</div>
+
+      {user?.name && (
+        <div className="px-3 py-2">
+          <p className="text-sm font-medium text-slate-900">{user?.name}</p>
+          <p className="text-xs text-slate-500">{user?.phone ?? user?.email ?? user?.role}</p>
+        </div>
+      )}
     </aside>
   );
 }

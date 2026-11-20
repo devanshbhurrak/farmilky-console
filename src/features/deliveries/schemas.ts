@@ -41,6 +41,7 @@ export const extraProductsSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1, 'Product is required'),
+        variantId: z.string().optional(),
         quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
         price: z.coerce.number().min(0, 'Price cannot be negative'),
       }),

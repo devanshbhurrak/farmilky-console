@@ -218,10 +218,13 @@ export default function OrderDetailPage() {
                   quantity: it.quantity,
                   price: it.price,
                 })),
-                paymentMethod:
-                  order.paymentMethod === 'online' || order.paymentMethod === 'upi'
-                    ? 'online'
-                    : 'COD',
+                paymentMethod: (() => {
+                  const method = order.paymentMethod;
+                  if (method === 'online' || method === 'upi') return 'online';
+                  if (method === 'cash' || method === 'other') return 'COD';
+                  if (method === 'bank_transfer' || method === 'card') return 'online';
+                  return 'COD';
+                })(),
                 deliveryDate: order.deliveryDate?.slice(0, 10) ?? '',
                 notes: order.notes ?? '',
               }}

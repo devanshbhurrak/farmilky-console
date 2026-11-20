@@ -43,7 +43,7 @@ function toAreaPayload(data: AreaInput): Record<string, unknown> {
 }
 
 export const areasApi = {
-  list: () => api.get<ApiResponse<Area[]>>('/api/areas'),
+  list: () => api.get<ApiResponse<Area[]>>('/api/areas', { limit: 100 }),
   get: (id: string) => api.get<ApiResponse<Area>>(`/api/areas/${id}`),
   create: (data: AreaInput) => api.post<ApiResponse<Area>>('/api/areas', toAreaPayload(data)),
   update: (id: string, data: AreaInput) =>

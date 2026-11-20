@@ -53,7 +53,7 @@ const paymentSchema = z.object({
 
 const adjustmentSchema = z.object({
   type: z.enum(['debit', 'credit']),
-  category: z.enum(['advance', 'transport', 'quality_bonus', 'quality_penalty', 'rounding', 'other']),
+  category: z.enum(['advance', 'transport', 'quality_bonus', 'quality_penalty', 'rounding', 'payment_difference', 'other']),
   amount: z.coerce.number().min(1, 'Amount must be at least ₹1'),
   date: z.string().optional(),
   description: z.string().trim().min(1, 'Description is required'),
@@ -308,6 +308,7 @@ function AdjustmentSection({
               <option value="quality_bonus">Quality bonus</option>
               <option value="quality_penalty">Quality penalty</option>
               <option value="rounding">Rounding</option>
+              <option value="payment_difference">Payment difference</option>
               <option value="other">Other</option>
             </Select>
           </FormField>

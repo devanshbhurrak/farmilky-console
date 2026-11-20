@@ -18,7 +18,12 @@ import { FormField } from '@/components/form/form-field';
 import { useDebounce } from '@/hooks/use-debounce';
 import { formatCurrency, getErrorMessage, getId, todayLocal } from '@/lib/utils';
 import type { BalanceSummary } from '@/types/transaction';
-import { useBalances, useRecordBalanceAdjustment, useRecordBalancePayment } from './hooks';
+import {
+  useBalances,
+  useBalanceSummary,
+  useRecordBalanceAdjustment,
+  useRecordBalancePayment,
+} from './hooks';
 
 function balanceOf(row: BalanceSummary): number {
   const raw = row.accountBalance ?? row.balance ?? 0;
@@ -172,17 +177,18 @@ export default function BalancesPage() {
   });
 
   const rows = useMemo(() => balancesQuery.data?.items ?? [], [balancesQuery.data]);
+  const summaryQuery = useBalanceSummary(debouncedSearch || undefined);
 
-  const stats = useMemo(() => {
-    let debt = 0;
-    let advances = 0;
-    for (const r of rows) {
-      const b = balanceOf(r);
-      if (b > 0) debt += b;
-      else advances += Math.abs(b);
-    }
-    return { debt, advances, count: balancesQuery.data?.meta.total ?? rows.length };
-  }, [rows, balancesQuery.data]);
+  // Totals come from the tenant-wide aggregate, not just this page — otherwise
+  // "Total debt / advances" would change with pagination.
+  const stats = useMemo(
+    () => ({
+      debt: summaryQuery.data?.totalDebt ?? 0,
+      advances: summaryQuery.data?.totalAdvances ?? 0,
+      count: summaryQuery.data?.totalCustomers ?? balancesQuery.data?.meta.total ?? rows.length,
+    }),
+    [summaryQuery.data, balancesQuery.data, rows.length],
+  );
 
   const columns: Column<BalanceSummary>[] = [
     {
